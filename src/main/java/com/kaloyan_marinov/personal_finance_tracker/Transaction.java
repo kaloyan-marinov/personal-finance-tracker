@@ -8,6 +8,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
 
 @Entity
 @Table(name = "transactions")
@@ -16,13 +18,20 @@ public class Transaction {
     @GeneratedValue (strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotNull
     // According to https://www.h2database.com/html/advanced.html ,
     // `YEAR` is a reserved SQL keyword in H2.
     @Column(
-        name = "year_"
+        name = "year_",
+        nullable = false
     )
     private Integer year;
 
+    @NotNull
+    // The following annotation is consistent with the values specified for `precision` and `scale`;
+    // rejects values like 4.789 - which the database would, if left to its own devices, round or reject! -
+    // and returns a 400 for them.
+    @Digits(integer = 16, fraction = 2)
     @Column(
         name = "amount",
         precision = 18,

@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 @RestController 
 public class TransactionController {
 
@@ -20,20 +22,10 @@ public class TransactionController {
     public TransactionController(TransactionRepository transactionRepository) {
         this.transactionRepository = transactionRepository;
     }
-    
-    @GetMapping("/transactions")
-    public ResponseEntity<Iterable<Transaction>> retrieveAll() {
-        Iterable<Transaction> transactions = transactionRepository.findAll();
-
-        return ResponseEntity
-            .status(HttpStatus.OK)
-            .body(transactions)
-        ;
-    }
 
     @PostMapping("/transactions")
     public ResponseEntity<Transaction> create(
-        @RequestBody Transaction transactionDTO
+        @Valid @RequestBody Transaction transactionDTO
     ) {
         Transaction createdTransaction = transactionRepository.save(transactionDTO);
 
@@ -60,27 +52,21 @@ public class TransactionController {
             .body(transaction)
         ;
     }
+    
+    @GetMapping("/transactions")
+    public ResponseEntity<Iterable<Transaction>> retrieveAll() {
+        Iterable<Transaction> transactions = transactionRepository.findAll();
 
-    @DeleteMapping("/transactions/{id}")
-    public ResponseEntity<Transaction> delete(
-        @PathVariable Long id
-    ) {
-        Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
-
-        if (optionalTransaction.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-
-        Transaction t = optionalTransaction.get();
-        transactionRepository.delete(t);
-
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(transactions)
+        ;
     }
 
     @PutMapping("/transactions/{id}")
     public ResponseEntity<Transaction> update(
         @PathVariable Long id,
-        @RequestBody Transaction transactionDTO
+        @Valid @RequestBody Transaction transactionDTO
     ) {
         Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
 
@@ -98,5 +84,21 @@ public class TransactionController {
         }
 
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
+
+    @DeleteMapping("/transactions/{id}")
+    public ResponseEntity<Void> delete(
+        @PathVariable Long id
+    ) {
+        Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
+
+        if (optionalTransaction.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        Transaction t = optionalTransaction.get();
+        transactionRepository.delete(t);
+
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

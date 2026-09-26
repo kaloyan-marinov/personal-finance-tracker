@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest(
 	properties = {
 		"spring.datasource.url=jdbc:h2:mem:test",
-		"spring.jpa.hibernate.ddl-auto=create-drop",
+		"spring.jpa.hibernate.ddl-auto=none",
 		"spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql"
 	}
 )
@@ -27,11 +27,66 @@ class TransactionControllerTests {
 	private RestTestClient restTestClient;
 
 	@Test
-	void create() {
+	void create_1() {
+		// Arrange.
+		Transaction transactionDTO = new Transaction();
+		transactionDTO.setYear(2000);
+
+		// Act + Assert.
+		String expectedBodyJSON = """
+			{
+				"error": "Validation failed",
+				"fieldErrors": {
+					"amount": "must not be null"
+				}
+			}	
+		""";
+
+		restTestClient
+			.post().uri("/transactions")
+			.body(transactionDTO)
+			.exchange()
+			.expectStatus().isBadRequest()
+			.expectBody().json(
+				expectedBodyJSON,
+				JsonCompareMode.STRICT
+			);
+	}
+
+	@Test
+	void create_2() {
+		// Arrange.
+		Transaction transactionDTO = new Transaction();
+		transactionDTO.setYear(2000);
+		transactionDTO.setAmount(new BigDecimal("4.789"));
+
+		// Act + Assert.
+		String expectedBodyJSON = """
+			{
+				"error": "Validation failed",
+				"fieldErrors": {
+					"amount": "numeric value out of bounds (<16 digits>.<2 digits> expected)"
+				}
+			}
+		""";
+
+		restTestClient
+			.post().uri("/transactions")
+			.body(transactionDTO)
+			.exchange()
+			.expectStatus().isBadRequest()
+			.expectBody().json(
+				expectedBodyJSON,
+				JsonCompareMode.STRICT
+			);
+	}
+
+	@Test
+	void create_3() {
 		// Arrange.
 		Transaction transactionDTO = new Transaction();
 		transactionDTO.setYear(2001);
-		transactionDTO.setAmount(new BigDecimal(100.00));
+		transactionDTO.setAmount(new BigDecimal("100.00"));
 
 		// Act.
 		Transaction transaction = restTestClient
@@ -58,7 +113,7 @@ class TransactionControllerTests {
 			.get().uri("/transactions/" + nonexistentId)
 			.exchange()
 			.expectStatus().isNotFound()
-			.expectBody().equals(null);
+			.expectBody().isEmpty();
 	}
 
 	@Test
@@ -66,7 +121,7 @@ class TransactionControllerTests {
 		// Arrange.
 		Transaction transactionDTO = new Transaction();
 		transactionDTO.setYear(2002);
-		transactionDTO.setAmount(new BigDecimal(200.00));
+		transactionDTO.setAmount(new BigDecimal("200.00"));
 
 		Transaction transaction = restTestClient
 			.post().uri("/transactions")
@@ -116,12 +171,12 @@ class TransactionControllerTests {
 	void retrieveAll_2() {
 		// Arrange.
 		Transaction transactionDTO6 = new Transaction();
-		transactionDTO6.setYear(2006);;
-		transactionDTO6.setAmount(new BigDecimal(600.00));
+		transactionDTO6.setYear(2006);
+		transactionDTO6.setAmount(new BigDecimal("600.00"));
 
 		Transaction transactionDTO7 = new Transaction();
 		transactionDTO7.setYear(2007);
-		transactionDTO7.setAmount(new BigDecimal(700.00));
+		transactionDTO7.setAmount(new BigDecimal("700.00"));
 
 		Transaction transaction6 = restTestClient
 			.post().uri("/transactions")
@@ -166,26 +221,12 @@ class TransactionControllerTests {
 	void update_1() {
 		// Arrange.
 		Transaction transactionDTO = new Transaction();
-		transactionDTO.setYear(2003);
-		transactionDTO.setAmount(new BigDecimal(300.00));
-
-		long nonexistentId = 17;
-
-		// Arrange + Act.
-		restTestClient
-			.put().uri("/transactions/" + nonexistentId)
-			.body(transactionDTO)
-			.exchange()
-			.expectStatus().isNotFound()
-			.expectBody().equals(null);
-	}
-
-	@Test
-	void update_2() {
-		// Arrange.
-		Transaction transactionDTO = new Transaction();
-		transactionDTO.setYear(3000 + 2004);
-		transactionDTO.setAmount(new BigDecimal(3000 + 400.00));
+		transactionDTO.setYear(3000 + 2003);
+		transactionDTO.setAmount(
+			new BigDecimal(
+				String.valueOf(3000 + 300.00)
+			)
+		);
 
 		Transaction transaction = restTestClient
 			.post().uri("/transactions")
@@ -197,12 +238,88 @@ class TransactionControllerTests {
 			.getResponseBody();
 		long transactionId = transaction.getId();
 
+		transactionDTO.setYear(null);
+		transactionDTO.setAmount(new BigDecimal("300.00"));
+
+		// Act + Assert.
+		String expectedBodyJSON1 = """
+			{
+				"error": "Validation failed",
+				"fieldErrors": {
+					"year": "must not be null"
+				}
+			}
+		""".formatted(transactionId);
+
+		restTestClient
+			.put().uri("/transactions/" + transactionId)
+			.body(transactionDTO)
+			.exchange()
+			.expectStatus().isBadRequest()
+			.expectBody().json(
+ 				expectedBodyJSON1,
+				JsonCompareMode.STRICT
+			);
+		
+		String expectedBodyJSON2 = """
+			{id: %d, year: 5003, amount: 3300.00}
+		""".formatted(transactionId);
+
+		restTestClient
+			.get().uri("/transactions/" + transactionId)
+			.exchange()
+			.expectStatus().isOk()
+			.expectBody().json(
+				expectedBodyJSON2,
+				JsonCompareMode.STRICT
+			);
+	}
+
+	@Test
+	void update_2() {
+		// Arrange.
+		Transaction transactionDTO = new Transaction();
 		transactionDTO.setYear(2004);
-		transactionDTO.setAmount(new BigDecimal(400.00));
+		transactionDTO.setAmount(new BigDecimal("400.00"));
+
+		long nonexistentId = 17;
+
+		// Arrange + Act.
+		restTestClient
+			.put().uri("/transactions/" + nonexistentId)
+			.body(transactionDTO)
+			.exchange()
+			.expectStatus().isNotFound()
+			.expectBody().isEmpty();
+	}
+
+	@Test
+	void update_3() {
+		// Arrange.
+		Transaction transactionDTO = new Transaction();
+		transactionDTO.setYear(3000 + 2005);
+		transactionDTO.setAmount(
+			new BigDecimal(
+				String.valueOf(3000 + 500.00)
+			)
+		);
+
+		Transaction transaction = restTestClient
+			.post().uri("/transactions")
+			.body(transactionDTO)
+			.exchange()
+			.expectStatus().isCreated()
+			.expectBody(Transaction.class)
+			.returnResult()
+			.getResponseBody();
+		long transactionId = transaction.getId();
+
+		transactionDTO.setYear(2005);
+		transactionDTO.setAmount(new BigDecimal("500.00"));
 
 		// Act + Assert.
 		String expectedBodyJSON = """
-			{id: %d, year: 2004, amount: 400}
+			{id: %d, year: 2005, amount: 500}
 		""".formatted(transactionId);
 
 		restTestClient
@@ -235,15 +352,15 @@ class TransactionControllerTests {
 			.delete().uri("/transactions/" + nonexistentId)
 			.exchange()
 			.expectStatus().isNotFound()
-			.expectBody().equals(null);
+			.expectBody().isEmpty();
 	}
 
 	@Test
 	void delete_2() {
 		// Arrange.
 		Transaction transactionDTO = new Transaction();
-		transactionDTO.setYear(2005);
-		transactionDTO.setAmount(new BigDecimal(500.00));
+		transactionDTO.setYear(2006);
+		transactionDTO.setAmount(new BigDecimal("600.00"));
 
 		Transaction transaction = restTestClient
 			.post().uri("/transactions")
@@ -260,12 +377,12 @@ class TransactionControllerTests {
 			.delete().uri("/transactions/" + transactionId)
 			.exchange()
 			.expectStatus().isNoContent()
-			.expectBody().equals(null);
+			.expectBody().isEmpty();
 		
 		restTestClient
 			.get().uri("/transactions/" + transactionId)
 			.exchange()
 			.expectStatus().isNotFound()
-			.expectBody().equals(null);
+			.expectBody().isEmpty();
 	}
 }

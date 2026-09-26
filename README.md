@@ -1,3 +1,19 @@
+# introduction
+
+`PersonalFinanceTracker` is a web application for tracking one's income, expenses, and wealth.
+
+Problem:
+A typical person lacks an easy way of computing her/his net worth.
+That is partly due to the fact that
+one's income, expenses, and wealth are scattered across
+multiple bank accounts, investment accounts, retirement savings accounts, etc.
+
+`PersonalFinanceTracker` provides a one-stop shop for
+recording (the annual values of) one's income, expenses, and assets,
+as well as computing one's net worth (as of a given year).
+
+
+
 # configure
 
 ```shell
@@ -10,7 +26,7 @@ $ cp \
 
 
 
-# create an empty database:
+# create an empty database
 
 ```shell
 $ podman run \
@@ -76,7 +92,7 @@ mysql> select ID, FILENAME, DATEEXECUTED from DATABASECHANGELOG;
 +-----------------+--------------------------------------------+---------------------+
 | ID              | FILENAME                                   | DATEEXECUTED        |
 +-----------------+--------------------------------------------+---------------------+
-| 1790190381140-1 | db/changelog/db.changelog-master.mysql.sql | 2026-09-23 19:13:03 |
+| 1790359465766-1 | db/changelog/db.changelog-master.mysql.sql | 2026-09-25 18:05:00 |
 +-----------------+--------------------------------------------+---------------------+
 1 row in set (0.00 sec)
 ```
@@ -106,7 +122,7 @@ $ (
 
 # ...
 
-# Running `show tables;` in the `mysql` shell now will return:
+# Running `SHOW TABLES;` in the `mysql` shell now will return:
 ```
 
 ```sql
