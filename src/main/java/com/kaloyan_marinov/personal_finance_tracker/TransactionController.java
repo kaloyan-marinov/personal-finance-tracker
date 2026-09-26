@@ -1,9 +1,6 @@
 package com.kaloyan_marinov.personal_finance_tracker;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.IntStream;
+import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,34 +14,32 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController 
 public class TransactionController {
-    
-    private static final List<Transaction> TRANSACTIONS = new ArrayList<>();
-    private final AtomicLong counter = new AtomicLong();
 
+    private TransactionRepository transactionRepository;
+
+    public TransactionController(TransactionRepository transactionRepository) {
+        this.transactionRepository = transactionRepository;
+    }
+    
     @GetMapping("/transactions")
-    public ResponseEntity<List<Transaction>> retrieveAll() {
+    public ResponseEntity<Iterable<Transaction>> retrieveAll() {
+        Iterable<Transaction> transactions = transactionRepository.findAll();
+
         return ResponseEntity
             .status(HttpStatus.OK)
-            .body(TRANSACTIONS)
+            .body(transactions)
         ;
     }
 
     @PostMapping("/transactions")
     public ResponseEntity<Transaction> create(
-        @RequestBody
-        TransactionDTO transactionDTO
+        @RequestBody Transaction transactionDTO
     ) {
-        Transaction t = new Transaction(
-            counter.incrementAndGet(),
-            transactionDTO.year(),
-            transactionDTO.amount()
-        );
-
-        TRANSACTIONS.add(t);
+        Transaction createdTransaction = transactionRepository.save(transactionDTO);
 
         return ResponseEntity
             .status(HttpStatus.CREATED)
-            .body(t)
+            .body(createdTransaction)
         ;
     }
 
@@ -52,12 +47,9 @@ public class TransactionController {
     public ResponseEntity<Transaction> retrieveOne(
         @PathVariable Long id
     ) {
-        Transaction transaction = TRANSACTIONS
-            .stream()
-            .filter((t) -> t.id() == id)
-            .findFirst()
-            .orElse(null)
-        ;
+        Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
+
+        Transaction transaction = optionalTransaction.orElse(null);
 
         if (transaction == null) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
@@ -73,19 +65,14 @@ public class TransactionController {
     public ResponseEntity<Transaction> delete(
         @PathVariable Long id
     ) {
-        Transaction transaction = TRANSACTIONS
-            .stream()
-            .filter((t) -> t.id() == id)
-            .findFirst()
-            .orElse(null)
-        ;
+        Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
 
-        if (transaction == null) {
+        if (optionalTransaction.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
 
-        // Mutate the original list in-place.
-        TRANSACTIONS.removeIf((t) -> t.id() == id);
+        Transaction t = optionalTransaction.get();
+        transactionRepository.delete(t);
 
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
@@ -93,29 +80,23 @@ public class TransactionController {
     @PutMapping("/transactions/{id}")
     public ResponseEntity<Transaction> update(
         @PathVariable Long id,
-        @RequestBody TransactionDTO transactionDTO
+        @RequestBody Transaction transactionDTO
     ) {
-        int idxOfTransaction = 
-            IntStream.range(0, TRANSACTIONS.size())
-            .filter((i) -> TRANSACTIONS.get(i).id() == id)
-            .findFirst()
-            .orElse(-1)
-        ;
+        Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
 
-        if (idxOfTransaction == -1) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        if (optionalTransaction.isPresent()) {
+            Transaction t = optionalTransaction.get();
+            
+            t.setYear(transactionDTO.getYear());
+            t.setAmount(transactionDTO.getAmount());
+            transactionRepository.save(t);
+
+            return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(t)
+            ;
         }
 
-        Transaction updatedTransaction = new Transaction(
-            id,
-            transactionDTO.year(),
-            transactionDTO.amount()
-        );
-        TRANSACTIONS.set(idxOfTransaction, updatedTransaction);
-
-        return ResponseEntity
-            .status(HttpStatus.OK)
-            .body(updatedTransaction)
-        ;
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 }
