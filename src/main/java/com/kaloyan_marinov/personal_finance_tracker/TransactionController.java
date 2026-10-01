@@ -25,9 +25,14 @@ public class TransactionController {
 
     @PostMapping("/transactions")
     public ResponseEntity<Transaction> create(
-        @Valid @RequestBody Transaction transactionDTO
+        @Valid @RequestBody TransactionRequest transactionRequest
     ) {
-        Transaction createdTransaction = transactionRepository.save(transactionDTO);
+        Transaction t = new Transaction();
+        t.setYear(transactionRequest.year());
+        t.setAmount(transactionRequest.amount());
+        t.setCurrency(transactionRequest.currency());
+        t.setDescription(transactionRequest.description());
+        Transaction createdTransaction = transactionRepository.save(t);
 
         return ResponseEntity
             .status(HttpStatus.CREATED)
@@ -66,15 +71,17 @@ public class TransactionController {
     @PutMapping("/transactions/{id}")
     public ResponseEntity<Transaction> update(
         @PathVariable Long id,
-        @Valid @RequestBody Transaction transactionDTO
+        @Valid @RequestBody TransactionRequest transactionRequest
     ) {
         Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
 
         if (optionalTransaction.isPresent()) {
             Transaction t = optionalTransaction.get();
             
-            t.setYear(transactionDTO.getYear());
-            t.setAmount(transactionDTO.getAmount());
+            t.setYear(transactionRequest.year());
+            t.setAmount(transactionRequest.amount());
+            t.setCurrency(transactionRequest.currency());
+            t.setDescription(transactionRequest.description());
             transactionRepository.save(t);
 
             return ResponseEntity

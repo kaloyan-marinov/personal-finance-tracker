@@ -2,14 +2,15 @@ package com.kaloyan_marinov.personal_finance_tracker;
 
 import java.math.BigDecimal;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotNull;
 
 @Entity
 @Table(name = "transactions")
@@ -18,7 +19,6 @@ public class Transaction {
     @GeneratedValue (strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull
     // According to https://www.h2database.com/html/advanced.html ,
     // `YEAR` is a reserved SQL keyword in H2.
     @Column(
@@ -27,11 +27,6 @@ public class Transaction {
     )
     private Integer year;
 
-    @NotNull
-    // The following annotation is consistent with the values specified for `precision` and `scale`;
-    // rejects values like 4.789 - which the database would, if left to its own devices, round or reject! -
-    // and returns a 400 for them.
-    @Digits(integer = 16, fraction = 2)
     @Column(
         name = "amount",
         precision = 18,
@@ -39,6 +34,22 @@ public class Transaction {
         nullable = false
     )
     private BigDecimal amount;
+
+    // Without `@JdbcTypeCode`, Hibernate would map a `String` to `VARCHAR` instead of `CHAR`.
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(
+        name = "currency",
+        length = 3,
+        nullable = false
+    )
+    private String currency;
+
+    @Column(
+        name = "description",
+        length = 255,
+        nullable = false
+    )
+    private String description;
 
     public Long getId() {
         return id;
@@ -58,5 +69,21 @@ public class Transaction {
 
     public void setAmount(BigDecimal amount) {
         this.amount = amount;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

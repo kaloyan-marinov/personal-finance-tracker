@@ -155,6 +155,42 @@
 						<artifactId>spring-boot-hibernate</artifactId>
 						<version>${project.parent.version}</version>
 					</dependency>
+
+					<!--
+					Maven runs each plugin in its own isolated classloader, called a "realm".
+
+					Without the following:
+
+						Hibernate would see Bean Validation in the project's classpath
+						but would try to use it from the plugin's classpath, where it isn't available.
+					
+						Only the former classloader would contain `jakarta.validation-api` and `hibernate-validator`.
+
+					`spring-boot-starter-validation` puts Bean Validation on the project's classpath,
+					so Hibernate activates its Bean Validation integration
+					(because `jakarta.persistence.validation.mode` defaults to `AUTO`,
+					which activates the integration whenever Bean Validation is on the classpath,
+					regardless of whether any entity carries constraint annotations such as `@NotNull`);
+					that integration lives in `hibernate-core` on the plugin's classpath,
+					so the Bean Validation classes must live on the plugin's own classpath too.
+					-->
+					<dependency>
+						<groupId>org.hibernate.validator</groupId>
+						<artifactId>hibernate-validator</artifactId>
+						<version>${hibernate-validator.version}</version>
+					</dependency>
+
+					<!--
+					Hibernate Validator's default message interpolator requires a Jakarta Expression Language implementation,
+					which `hibernate-validator` itself does not bring;
+					`spring-boot-starter-validation` provides this one on the project's classpath,
+					so it must live on the plugin's own classpath too.
+					-->
+					<dependency>
+						<groupId>org.apache.tomcat.embed</groupId>
+						<artifactId>tomcat-embed-el</artifactId>
+						<version>${tomcat.version}</version>
+					</dependency>
 				</dependencies>
 			</plugin>
 

@@ -1,3 +1,14 @@
+# A FEW WORDS OF CAUTION
+#
+# Each request below is stored as a string in `cmd` and executed via `eval "$cmd"`,
+# so that quoted arguments containing spaces (e.g. 'description=train ticket') stay intact.
+# That is safe here,
+# because every `cmd` is built from literals within this script.
+#
+# `eval` is only dangerous
+# when the string it runs contains data you don't control (script arguments, env vars, HTTP responses);
+# here, every cmd="..." is a fixed string written into the script.
+
 create_transaction() {
     http POST \
         localhost:8080/transactions \
@@ -51,8 +62,8 @@ echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
 cmd="retrieve_transactions"
-echo $cmd
-$cmd
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -61,18 +72,18 @@ $cmd
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2000"
-echo $cmd
-$cmd
+cmd="create_transaction year=2000 currency=EUR 'description=train ticket'"
+echo "$cmd"
+eval "$cmd"
 
 
 
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2000 amount:=4.789"
-echo $cmd
-$cmd
+cmd="create_transaction year=2000 amount:=-4.789 currency=EUR 'description=train ticket'"
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -80,27 +91,27 @@ $cmd
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2000 amount=0"
-echo $cmd
-$cmd
+cmd="create_transaction year=2010 amount=-10 currency=EUR 'description=train ticket'"
+echo "$cmd"
+eval "$cmd"
 
 
 
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2010 amount=10"
-echo $cmd
-$cmd
+cmd="create_transaction year=2020 amount=-20 currency=EUR 'description=train ticket'"
+echo "$cmd"
+eval "$cmd"
 
 
 
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2020 amount=20"
-echo $cmd
-$cmd
+cmd="create_transaction year=2030 amount=-30 currency=EUR 'description=train ticket'"
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -108,9 +119,9 @@ $cmd
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2020 amount=20"
-echo $cmd
-$cmd
+cmd="create_transaction year=2030 amount=-30 currency=EUR 'description=train ticket'"
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -118,8 +129,8 @@ echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
 cmd="retrieve_transactions"
-echo $cmd
-$cmd
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -130,8 +141,8 @@ echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
 cmd="retrieve_one_transaction $nonexistent_id"
-echo $cmd
-$cmd
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -141,8 +152,8 @@ echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
 cmd="retrieve_one_transaction $existent_id"
-echo $cmd
-$cmd
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -150,27 +161,27 @@ $cmd
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="update_transaction $nonexistent_id year=2020 amount=20"
-echo $cmd
-$cmd
+cmd="update_transaction $nonexistent_id year=2020 amount=-20 currency=EUR 'description=train ticket'"
+echo "$cmd"
+eval "$cmd"
 
 
 # The following request should leave the (targeted) transaction unchanged.
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="update_transaction $existent_id year:=null amount=30"
-echo $cmd
-$cmd
+cmd="update_transaction $existent_id year:=null amount=-30 currency=EUR 'description=train ticket'"
+echo "$cmd"
+eval "$cmd"
 
 
 
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="update_transaction $existent_id year=3030 amount=30"
-echo $cmd
-$cmd
+cmd="update_transaction $existent_id year=3060 amount=-60 currency=USD 'description=train ticket'"
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -178,8 +189,8 @@ echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
 cmd="retrieve_transactions"
-echo $cmd
-$cmd
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -188,8 +199,8 @@ echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
 cmd="delete_transaction $nonexistent_id"
-echo $cmd
-$cmd
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -197,8 +208,8 @@ echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
 cmd="delete_transaction $existent_id"
-echo $cmd
-$cmd
+echo "$cmd"
+eval "$cmd"
 
 
 
@@ -206,5 +217,5 @@ echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
 cmd="retrieve_transactions"
-echo $cmd
-$cmd
+echo "$cmd"
+eval "$cmd"
