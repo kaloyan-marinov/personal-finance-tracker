@@ -10,11 +10,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
-@RestController 
+@RestController
+@RequestMapping("/api/v1/transactions")
 public class TransactionController {
 
     private TransactionRepository transactionRepository;
@@ -23,7 +25,7 @@ public class TransactionController {
         this.transactionRepository = transactionRepository;
     }
 
-    @PostMapping("/transactions")
+    @PostMapping("")
     public ResponseEntity<Transaction> create(
         @Valid @RequestBody TransactionRequest transactionRequest
     ) {
@@ -40,7 +42,7 @@ public class TransactionController {
         ;
     }
 
-    @GetMapping("/transactions/{id}")
+    @GetMapping("/{id}")
     public ResponseEntity<Transaction> retrieveOne(
         @PathVariable Long id
     ) {
@@ -58,7 +60,7 @@ public class TransactionController {
         ;
     }
     
-    @GetMapping("/transactions")
+    @GetMapping("")
     public ResponseEntity<Iterable<Transaction>> retrieveAll() {
         Iterable<Transaction> transactions = transactionRepository.findAll();
 
@@ -68,7 +70,7 @@ public class TransactionController {
         ;
     }
 
-    @PutMapping("/transactions/{id}")
+    @PutMapping("/{id}")
     public ResponseEntity<Transaction> update(
         @PathVariable Long id,
         @Valid @RequestBody TransactionRequest transactionRequest
@@ -93,7 +95,7 @@ public class TransactionController {
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
-    @DeleteMapping("/transactions/{id}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
         @PathVariable Long id
     ) {

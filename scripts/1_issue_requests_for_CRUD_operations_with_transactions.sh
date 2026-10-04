@@ -11,7 +11,7 @@
 
 create_transaction() {
     http POST \
-        localhost:8080/transactions \
+        localhost:8080/api/v1/transactions \
         "$@"
 }
 
@@ -20,12 +20,12 @@ retrieve_one_transaction() {
     local id="${1:?usage: retrieve_one_transaction <id> [http args...]}"
 
     http \
-        "localhost:8080/transactions/$id"
+        "localhost:8080/api/v1/transactions/$id"
 }
 
 retrieve_transactions() {
     http \
-        localhost:8080/transactions
+        localhost:8080/api/v1/transactions
 }
 
 update_transaction() {
@@ -37,7 +37,7 @@ update_transaction() {
     local id="${1:?usage: update_transaction <id> [http args...]}"; shift
 
     http PUT \
-        "localhost:8080/transactions/$id" \
+        "localhost:8080/api/v1/transactions/$id" \
         "$@"
 }
 
@@ -46,7 +46,7 @@ delete_transaction() {
     local id="${1:?usage: delete_transaction <id> [http args...]}"
 
     http DELETE \
-        "localhost:8080/transactions/$id"
+        "localhost:8080/api/v1/transactions/$id"
 }
 
 add_up_underscore_separated_numbers() {

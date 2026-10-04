@@ -53,7 +53,7 @@ class TransactionControllerTests {
 		""";
 
 		restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isBadRequest()
@@ -88,7 +88,7 @@ class TransactionControllerTests {
 		""";
 
 		restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isBadRequest()
@@ -129,7 +129,7 @@ class TransactionControllerTests {
 			""";
 
 			restTestClient
-				.post().uri("/transactions")
+				.post().uri("/api/v1/transactions")
 				.body(transactionRequest)
 				.exchange()
 				.expectStatus().isBadRequest()
@@ -165,7 +165,7 @@ class TransactionControllerTests {
 		""";
 
 		restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isBadRequest()
@@ -205,7 +205,7 @@ class TransactionControllerTests {
 			""";
 
 			restTestClient
-				.post().uri("/transactions")
+				.post().uri("/api/v1/transactions")
 				.body(transactionRequest)
 				.exchange()
 				.expectStatus().isBadRequest()
@@ -241,7 +241,7 @@ class TransactionControllerTests {
 		""";
 
 		restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isBadRequest()
@@ -273,7 +273,7 @@ class TransactionControllerTests {
 
 		// Act.
 		Transaction transaction = restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isCreated()
@@ -299,7 +299,7 @@ class TransactionControllerTests {
 		""".formatted(transactionId, description);
 
 		restTestClient
-			.get().uri("/transactions/" + transactionId)
+			.get().uri("/api/v1/transactions/" + transactionId)
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody().json(
@@ -328,7 +328,7 @@ class TransactionControllerTests {
 		);
 
 		Transaction transaction = restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isCreated()
@@ -349,7 +349,7 @@ class TransactionControllerTests {
 
 		// Act.
 		Transaction newTransaction = restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(newTransactionRequestWithId)
 			.exchange()
 			.expectStatus().isCreated()
@@ -377,7 +377,7 @@ class TransactionControllerTests {
 			description
 		);
 		restTestClient
-			.get().uri("/transactions/" + transactionId)
+			.get().uri("/api/v1/transactions/" + transactionId)
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody().json(
@@ -393,7 +393,7 @@ class TransactionControllerTests {
 
 		// Act + Assert.
 		restTestClient
-			.get().uri("/transactions/" + nonexistentId)
+			.get().uri("/api/v1/transactions/" + nonexistentId)
 			.exchange()
 			.expectStatus().isNotFound()
 			.expectBody().isEmpty();
@@ -414,7 +414,7 @@ class TransactionControllerTests {
 		);
 
 		Transaction transaction = restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isCreated()
@@ -435,7 +435,7 @@ class TransactionControllerTests {
 		""".formatted(transactionId);
 
 		restTestClient
-			.get().uri("/transactions/" + transactionId)
+			.get().uri("/api/v1/transactions/" + transactionId)
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody().json(
@@ -453,7 +453,7 @@ class TransactionControllerTests {
 
 		// Act + Assert.
 		restTestClient
-			.get().uri("/transactions")
+			.get().uri("/api/v1/transactions")
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody().json(
@@ -488,7 +488,7 @@ class TransactionControllerTests {
 		);
 
 		Transaction transaction6 = restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest6)
 			.exchange()
 			.expectStatus().isCreated()
@@ -497,7 +497,7 @@ class TransactionControllerTests {
 			.getResponseBody();
 		
 		Transaction transaction7 = restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest7)
 			.exchange()
 			.expectStatus().isCreated()
@@ -529,7 +529,7 @@ class TransactionControllerTests {
 		);
 
 		restTestClient
-			.get().uri("/transactions")
+			.get().uri("/api/v1/transactions")
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody().json(
@@ -555,7 +555,7 @@ class TransactionControllerTests {
 		);
 
 		Transaction transaction = restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isCreated()
@@ -586,7 +586,7 @@ class TransactionControllerTests {
 		""";
 
 		restTestClient
-			.put().uri("/transactions/" + transactionId)
+			.put().uri("/api/v1/transactions/" + transactionId)
 			.body(updateRequest)
 			.exchange()
 			.expectStatus().isBadRequest()
@@ -606,7 +606,7 @@ class TransactionControllerTests {
 		""".formatted(transactionId);
 
 		restTestClient
-			.get().uri("/transactions/" + transactionId)
+			.get().uri("/api/v1/transactions/" + transactionId)
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody().json(
@@ -633,7 +633,7 @@ class TransactionControllerTests {
 
 		// Arrange + Act.
 		restTestClient
-			.put().uri("/transactions/" + nonexistentId)
+			.put().uri("/api/v1/transactions/" + nonexistentId)
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isNotFound()
@@ -657,7 +657,7 @@ class TransactionControllerTests {
 		);
 
 		Transaction transaction = restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isCreated()
@@ -689,7 +689,7 @@ class TransactionControllerTests {
 		""".formatted(transactionId);
 
 		restTestClient
-			.put().uri("/transactions/" + transactionId)
+			.put().uri("/api/v1/transactions/" + transactionId)
 			.body(updateTransactionRequest)
 			.exchange()
 			.expectStatus().isOk()
@@ -699,7 +699,7 @@ class TransactionControllerTests {
 			);
 		
 		restTestClient
-			.get().uri("/transactions/" + transactionId)
+			.get().uri("/api/v1/transactions/" + transactionId)
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody().json(
@@ -715,7 +715,7 @@ class TransactionControllerTests {
 
 		// Act + Assert.
 		restTestClient
-			.delete().uri("/transactions/" + nonexistentId)
+			.delete().uri("/api/v1/transactions/" + nonexistentId)
 			.exchange()
 			.expectStatus().isNotFound()
 			.expectBody().isEmpty();
@@ -736,7 +736,7 @@ class TransactionControllerTests {
 		);
 
 		Transaction transaction = restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isCreated()
@@ -747,13 +747,13 @@ class TransactionControllerTests {
 
 		// Act + Assert.
 		restTestClient
-			.delete().uri("/transactions/" + transactionId)
+			.delete().uri("/api/v1/transactions/" + transactionId)
 			.exchange()
 			.expectStatus().isNoContent()
 			.expectBody().isEmpty();
 		
 		restTestClient
-			.get().uri("/transactions/" + transactionId)
+			.get().uri("/api/v1/transactions/" + transactionId)
 			.exchange()
 			.expectStatus().isNotFound()
 			.expectBody().isEmpty();

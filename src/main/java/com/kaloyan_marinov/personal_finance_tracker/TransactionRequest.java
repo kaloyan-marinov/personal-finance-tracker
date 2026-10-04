@@ -8,7 +8,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-// The request body of `POST /transactions` and `PUT /transactions/{id}`.
+// This represents the body
+// of an HTTP request for creating a new `Transaction`
+// or of one for updating an existing `Transaction`.
 // It deliberately has no `id`, so a client cannot choose (and thereby overwrite) an existing row;
 // an `id` sent in the JSON body is ignored.
 public record TransactionRequest(

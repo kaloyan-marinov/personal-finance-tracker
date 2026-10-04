@@ -40,7 +40,7 @@ class TotalsControllerTests {
 		""";
 
 		restTestClient
-			.get().uri("/totals")
+			.get().uri("/api/v1/totals")
 			.exchange()
 			.expectStatus().isBadRequest()
 			.expectBody().json(
@@ -65,7 +65,7 @@ class TotalsControllerTests {
 		""";
 
 		restTestClient
-			.get().uri("/totals?year=" + nonIntegerYear )
+			.get().uri("/api/v1/totals?year=" + nonIntegerYear )
 			.exchange()
 			.expectStatus().isBadRequest()
 			.expectBody().json(
@@ -83,7 +83,7 @@ class TotalsControllerTests {
 
 		// Act.
 		TotalsResponse observed = restTestClient
-			.get().uri("/totals?year=" + year)
+			.get().uri("/api/v1/totals?year=" + year)
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody(TotalsResponse.class)
@@ -122,7 +122,7 @@ class TotalsControllerTests {
 
 		// Act.
 		TotalsResponse observed = restTestClient
-			.get().uri("/totals?year=" + year)
+			.get().uri("/api/v1/totals?year=" + year)
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody(TotalsResponse.class)
@@ -167,7 +167,7 @@ class TotalsControllerTests {
 
 		// Act.
 		TotalsResponse observed = restTestClient
-			.get().uri("/totals?year=" + year)
+			.get().uri("/api/v1/totals?year=" + year)
 			.exchange()
 			.expectStatus().isOk()
 			.expectBody(TotalsResponse.class)
@@ -198,7 +198,7 @@ class TotalsControllerTests {
 		);
 
 		restTestClient
-			.post().uri("/transactions")
+			.post().uri("/api/v1/transactions")
 			.body(transactionRequest)
 			.exchange()
 			.expectStatus().isCreated();
