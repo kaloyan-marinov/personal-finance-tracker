@@ -1,4 +1,4 @@
-package com.kaloyan_marinov.personal_finance_tracker;
+package com.kaloyan_marinov.personal_finance_tracker.transaction;
 
 import java.util.List;
 
@@ -55,7 +55,7 @@ public interface TransactionRepository extends CrudRepository<Transaction, Long>
      */
     @Query("""
         SELECT
-            new com.kaloyan_marinov.personal_finance_tracker.CurrencyTotal(
+            new com.kaloyan_marinov.personal_finance_tracker.transaction.CurrencyTotal(
                 t.currency,
                 SIGN(t.amount),
                 SUM(t.amount)

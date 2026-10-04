@@ -1,4 +1,4 @@
-package com.kaloyan_marinov.personal_finance_tracker;
+package com.kaloyan_marinov.personal_finance_tracker.transaction;
 
 import java.util.Optional;
 

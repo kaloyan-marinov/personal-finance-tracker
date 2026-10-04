@@ -1,4 +1,4 @@
-package com.kaloyan_marinov.personal_finance_tracker;
+package com.kaloyan_marinov.personal_finance_tracker.totals;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -12,6 +12,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.kaloyan_marinov.personal_finance_tracker.transaction.Transaction;
+import com.kaloyan_marinov.personal_finance_tracker.transaction.TransactionRequest;
 
 @SpringBootTest(
 	properties = {

@@ -1,4 +1,4 @@
-package com.kaloyan_marinov.personal_finance_tracker;
+package com.kaloyan_marinov.personal_finance_tracker.totals;
 
 import java.math.BigDecimal;
 import java.util.Map;

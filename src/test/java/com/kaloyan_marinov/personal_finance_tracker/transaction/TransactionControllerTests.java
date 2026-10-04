@@ -1,4 +1,4 @@
-package com.kaloyan_marinov.personal_finance_tracker;
+package com.kaloyan_marinov.personal_finance_tracker.transaction;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
