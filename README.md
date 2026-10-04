@@ -92,9 +92,10 @@ mysql> select ID, FILENAME, DATEEXECUTED from DATABASECHANGELOG;
 +-----------------+--------------------------------------------+---------------------+
 | ID              | FILENAME                                   | DATEEXECUTED        |
 +-----------------+--------------------------------------------+---------------------+
-| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-01 19:14:27 |
+| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-03 21:16:18 |
+| 1791063470290-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-03 21:17:42 |
 +-----------------+--------------------------------------------+---------------------+
-1 row in set (0.00 sec)
+2 rows in set (0.00 sec)
 ```
 
 
@@ -173,9 +174,13 @@ Use another terminal window to issue these HTTP requests:
 # The following will work
 # only if the HTTPie command line tool is installed on your machine.
 
-$ chmod u+x scripts/issue_requests.sh
+$ chmod u+x scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
+$ scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
 
-$ scripts/issue_requests.sh
+# Create an empty database from scratch.
+
+$ chmod u+x scripts/2_issue_requests_for_computing_totals.sh
+$ scripts/2_issue_requests_for_computing_totals.sh
 ```
 
 

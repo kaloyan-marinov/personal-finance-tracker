@@ -6,8 +6,10 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ValidationExceptionHandler {
@@ -34,6 +36,38 @@ public class ValidationExceptionHandler {
                 Map.of(
                     "error", "Validation failed",
                     "fieldErrors", fieldErrors
+                )
+            );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingParameter(
+        MissingServletRequestParameterException e
+    ) {
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(
+                Map.of(
+                    "error", "Validation failed",
+                    "fieldErrors", Map.of(e.getParameterName(), "must be provided")
+                )
+            );
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(
+        MethodArgumentTypeMismatchException e
+    ) {
+        String expectedType = e.getRequiredType() == null
+            ? "a valid value"
+            : "of type " + e.getRequiredType().getSimpleName();
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(
+                Map.of(
+                    "error", "Validation failed",
+                    "fieldErrors", Map.of(e.getName(), "must be " + expectedType)
                 )
             );
     }

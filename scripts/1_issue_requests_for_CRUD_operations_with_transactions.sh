@@ -49,6 +49,23 @@ delete_transaction() {
         "localhost:8080/transactions/$id"
 }
 
+add_up_underscore_separated_numbers() {
+    local total=0
+    local number_as_string
+
+    for number_as_string in "$@"; do
+        # Strip all underscores
+        number=${number_as_string//_/}
+
+        total=$((total + number))
+    done
+    
+    echo $total
+}
+
+#add_up_underscore_separated_numbers 1 2 3 4
+
+#add_up_underscore_separated_numbers 3_065.50
 
 
 N_SECONDS=1
@@ -72,7 +89,7 @@ eval "$cmd"
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2000 currency=EUR 'description=train ticket'"
+cmd="create_transaction year:=2000 currency=EUR 'description=train ticket'"
 echo "$cmd"
 eval "$cmd"
 
@@ -81,7 +98,7 @@ eval "$cmd"
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2000 amount:=-4.789 currency=EUR 'description=train ticket'"
+cmd="create_transaction year:=2000 amount:=-4.789 currency=EUR 'description=train ticket'"
 echo "$cmd"
 eval "$cmd"
 
@@ -91,7 +108,7 @@ eval "$cmd"
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2010 amount=-10 currency=EUR 'description=train ticket'"
+cmd="create_transaction year:=2010 amount:=-10 currency=EUR 'description=train ticket'"
 echo "$cmd"
 eval "$cmd"
 
@@ -100,7 +117,7 @@ eval "$cmd"
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2020 amount=-20 currency=EUR 'description=train ticket'"
+cmd="create_transaction year:=2020 amount:=-20 currency=EUR 'description=train ticket'"
 echo "$cmd"
 eval "$cmd"
 
@@ -109,7 +126,7 @@ eval "$cmd"
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2030 amount=-30 currency=EUR 'description=train ticket'"
+cmd="create_transaction year:=2030 amount:=-30 currency=EUR 'description=train ticket'"
 echo "$cmd"
 eval "$cmd"
 
@@ -119,7 +136,7 @@ eval "$cmd"
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="create_transaction year=2030 amount=-30 currency=EUR 'description=train ticket'"
+cmd="create_transaction year:=2030 amount:=-30 currency=EUR 'description=train ticket'"
 echo "$cmd"
 eval "$cmd"
 
@@ -161,7 +178,7 @@ eval "$cmd"
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="update_transaction $nonexistent_id year=2020 amount=-20 currency=EUR 'description=train ticket'"
+cmd="update_transaction $nonexistent_id year:=2020 amount:=-20 currency=EUR 'description=train ticket'"
 echo "$cmd"
 eval "$cmd"
 
@@ -170,7 +187,7 @@ eval "$cmd"
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="update_transaction $existent_id year:=null amount=-30 currency=EUR 'description=train ticket'"
+cmd="update_transaction $existent_id year:=null amount:=-30 currency=EUR 'description=train ticket'"
 echo "$cmd"
 eval "$cmd"
 
@@ -179,7 +196,7 @@ eval "$cmd"
 echo "sleeping for $N_SECONDS second(s)"
 sleep $N_SECONDS
 
-cmd="update_transaction $existent_id year=3060 amount=-60 currency=USD 'description=train ticket'"
+cmd="update_transaction $existent_id year:=3060 amount:=-60 currency=USD 'description=train ticket'"
 echo "$cmd"
 eval "$cmd"
 

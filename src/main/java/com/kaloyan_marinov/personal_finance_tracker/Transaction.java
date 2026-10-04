@@ -10,10 +10,17 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "transactions")
+@Table(
+    name = "transactions",
+    indexes = @Index(
+        name = "idx_transactions_year_currency",
+        columnList = "year_, currency"
+    )
+)
 public class Transaction {
     @Id
     @GeneratedValue (strategy = GenerationType.IDENTITY)
