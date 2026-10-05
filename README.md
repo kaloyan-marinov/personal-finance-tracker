@@ -70,11 +70,11 @@ $ (
 )
 
 UPDATE SUMMARY
-Run:                          1
+Run:                          6
 Previously run:               0
 Filtered out:                 0
 -------------------------------
-Total change sets:            1
+Total change sets:            6
 ```
 
 ```sql
@@ -84,18 +84,23 @@ mysql> SHOW TABLES;
 +-----------------------+
 | DATABASECHANGELOG     |
 | DATABASECHANGELOGLOCK |
+| exchange_rates        |
 | transactions          |
 +-----------------------+
-3 rows in set (0.00 sec)
+4 rows in set (0.00 sec)
 
 mysql> select ID, FILENAME, DATEEXECUTED from DATABASECHANGELOG;
 +-----------------+--------------------------------------------+---------------------+
 | ID              | FILENAME                                   | DATEEXECUTED        |
 +-----------------+--------------------------------------------+---------------------+
-| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-03 21:16:18 |
-| 1791063470290-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-03 21:17:42 |
+| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
+| 1791063470290-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
+| 1791224952245-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
+| 1791224952245-2 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
+| 1791224952245-3 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
+| 1791224952245-4 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
 +-----------------+--------------------------------------------+---------------------+
-2 rows in set (0.00 sec)
+6 rows in set (0.00 sec)
 ```
 
 
@@ -133,9 +138,10 @@ mysql> SHOW TABLES;
 +-----------------------+
 | DATABASECHANGELOG     |
 | DATABASECHANGELOGLOCK |
+| exchange_rates        |
 | transactions          |
 +-----------------------+
-3 rows in set (0.00 sec)
+4 rows in set (0.00 sec)
 
 mysql> select ID, FILENAME, DATEEXECUTED from DATABASECHANGELOG;
 -- The output should be identical to
@@ -181,6 +187,11 @@ $ scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
 
 $ chmod u+x scripts/2_issue_requests_for_computing_totals.sh
 $ scripts/2_issue_requests_for_computing_totals.sh
+
+# Create an empty database from scratch.
+
+$ chmod u+x scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
+$ scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
 ```
 
 
