@@ -418,9 +418,9 @@ class ExchangeRateControllerTests {
 	}
 
 	/**
-	 * Creates a rate and then GETs it with a lowercase currency code.
-	 * Expects a 404, because path variables are not validated separately
-	 * and simply match no row.
+	 * Creates a rate
+	 * and then attempts to GET it with a lowercase {@code sourceCurrency}.
+	 * Expects a 400 response, which reports the violated pattern.
 	 */
 	@Test
 	void retrieveOne_3() {
@@ -434,11 +434,23 @@ class ExchangeRateControllerTests {
 		createExchangeRate(exchangeRateRequestCreate);
 
 		// Act + Assert.
+		String expectedBodyJSON = """
+			{
+				"error": "Validation failed",
+				"fieldErrors": {
+					"sourceCurrency": "must match \\"^[A-Z]{3}$\\""
+				}
+			}
+		""";
+
 		restTestClient
 			.get().uri("/api/v1/exchange-rates/2003/eur/USD")
 			.exchange()
-			.expectStatus().isNotFound()
-			.expectBody().isEmpty();
+			.expectStatus().isBadRequest()
+			.expectBody().json(
+				expectedBodyJSON,
+				JsonCompareMode.STRICT
+			);
 	}
 
 	/**
@@ -650,6 +662,65 @@ class ExchangeRateControllerTests {
 	}
 
 	/**
+	 * Creates a rate and then PUTs to it with a lowercase {@code targetCurrency}.
+	 * Expects a 400 response, which reports the violated pattern, and that the rate is unchanged.
+	 */
+	@Test
+	void update_4() {
+		// Arrange.
+		ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
+			2004,
+			"EUR",
+			"USD",
+			new BigDecimal("1.085")
+		);
+		ExchangeRate exchangeRate = createExchangeRate(exchangeRateRequestCreate);
+
+		ExchangeRateRequestUpdate updateRequest = new ExchangeRateRequestUpdate(
+			new BigDecimal("1.1")
+		);
+
+		// Act + Assert.
+		String expectedBodyJSON1 = """
+			{
+				"error": "Validation failed",
+				"fieldErrors": {
+					"targetCurrency": "must match \\"^[A-Z]{3}$\\""
+				}
+			}
+		""";
+
+		restTestClient
+			.put().uri("/api/v1/exchange-rates/2004/EUR/usd")
+			.body(updateRequest)
+			.exchange()
+			.expectStatus().isBadRequest()
+			.expectBody().json(
+				expectedBodyJSON1,
+				JsonCompareMode.STRICT
+			);
+
+		String expectedBodyJSON2 = """
+			{
+				id: %d,
+				year: 2004,
+				sourceCurrency: "EUR",
+				targetCurrency: "USD",
+				sourceToTargetFactor: 1.085
+			}
+		""".formatted(exchangeRate.getId());
+
+		restTestClient
+			.get().uri("/api/v1/exchange-rates/2004/EUR/USD")
+			.exchange()
+			.expectStatus().isOk()
+			.expectBody().json(
+				expectedBodyJSON2,
+				JsonCompareMode.STRICT
+			);
+	}
+
+	/**
 	 * DELETEs a rate which does not exist.
 	 * Expects a 404 response with an empty body.
 	 */
@@ -690,5 +761,45 @@ class ExchangeRateControllerTests {
 			.exchange()
 			.expectStatus().isNotFound()
 			.expectBody().isEmpty();
+	}
+
+	/**
+	 * Creates a rate and then DELETEs it with a lowercase {@code sourceCurrency}.
+	 * Expects a 400 response, which reports the violated pattern, and that the rate still exists.
+	 */
+	@Test
+	void delete_3() {
+		// Arrange.
+		ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
+			2003,
+			"EUR",
+			"USD",
+			new BigDecimal("1.085")
+		);
+		createExchangeRate(exchangeRateRequestCreate);
+
+		// Act + Assert.
+		String expectedBodyJSON = """
+			{
+				"error": "Validation failed",
+				"fieldErrors": {
+					"sourceCurrency": "must match \\"^[A-Z]{3}$\\""
+				}
+			}
+		""";
+
+		restTestClient
+			.delete().uri("/api/v1/exchange-rates/2003/eur/USD")
+			.exchange()
+			.expectStatus().isBadRequest()
+			.expectBody().json(
+				expectedBodyJSON,
+				JsonCompareMode.STRICT
+			);
+
+		restTestClient
+			.get().uri("/api/v1/exchange-rates/2003/EUR/USD")
+			.exchange()
+			.expectStatus().isOk();
 	}
 }

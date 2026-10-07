@@ -16,9 +16,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 
 // An exchange rate is addressed by its natural key, `{year}/{sourceCurrency}/{targetCurrency}`,
 // which plays the role that `{id}` plays for transactions.
+//
+// The `sourceCurrency` and `targetCurrency` path variables
+// must match the same `@Pattern` as
+// the corresponding fields of the `@RequestBody`-annotated arguments;
+// the reason why this extra caution is worthwhile is as follows:
+// - `eur` would match no row on an H2 database;
+// - `eur` could match `EUR` on a MySQL database
+//   (if that database has been created with case-insensitive collation);
+// consequently,
+// validating the values up-front makes the result independent of the database.
 @RestController
 @RequestMapping("/api/v1/exchange-rates")
 public class ExchangeRateController {
@@ -68,8 +79,8 @@ public class ExchangeRateController {
     @GetMapping("/{year}/{sourceCurrency}/{targetCurrency}")
     public ResponseEntity<ExchangeRate> retrieveOne(
         @PathVariable Integer year,
-        @PathVariable String sourceCurrency,
-        @PathVariable String targetCurrency
+        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String sourceCurrency,
+        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String targetCurrency
     ) {
         Optional<ExchangeRate> optionalExchangeRate = exchangeRateRepository
             .findByYearAndSourceCurrencyAndTargetCurrency(year, sourceCurrency, targetCurrency);
@@ -99,8 +110,8 @@ public class ExchangeRateController {
     @PutMapping("/{year}/{sourceCurrency}/{targetCurrency}")
     public ResponseEntity<ExchangeRate> update(
         @PathVariable Integer year,
-        @PathVariable String sourceCurrency,
-        @PathVariable String targetCurrency,
+        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String sourceCurrency,
+        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String targetCurrency,
         @Valid @RequestBody ExchangeRateRequestUpdate exchangeRateRequestUpdate
     ) {
         Optional<ExchangeRate> optionalExchangeRate = exchangeRateRepository
@@ -123,8 +134,8 @@ public class ExchangeRateController {
     @DeleteMapping("/{year}/{sourceCurrency}/{targetCurrency}")
     public ResponseEntity<Void> delete(
         @PathVariable Integer year,
-        @PathVariable String sourceCurrency,
-        @PathVariable String targetCurrency
+        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String sourceCurrency,
+        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String targetCurrency
     ) {
         Optional<ExchangeRate> optionalExchangeRate = exchangeRateRepository
             .findByYearAndSourceCurrencyAndTargetCurrency(year, sourceCurrency, targetCurrency);

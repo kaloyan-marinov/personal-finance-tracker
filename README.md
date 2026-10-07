@@ -93,12 +93,12 @@ mysql> select ID, FILENAME, DATEEXECUTED from DATABASECHANGELOG;
 +-----------------+--------------------------------------------+---------------------+
 | ID              | FILENAME                                   | DATEEXECUTED        |
 +-----------------+--------------------------------------------+---------------------+
-| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
-| 1791063470290-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
-| 1791224952245-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
-| 1791224952245-2 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
-| 1791224952245-3 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
-| 1791224952245-4 | db/changelog/db.changelog-master.mysql.sql | 2026-10-05 18:22:44 |
+| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:48 |
+| 1791063470290-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:48 |
+| 1791224952245-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:48 |
+| 1791224952245-2 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:48 |
+| 1791224952245-3 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:49 |
+| 1791224952245-4 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:49 |
 +-----------------+--------------------------------------------+---------------------+
 6 rows in set (0.00 sec)
 ```
@@ -192,6 +192,11 @@ $ scripts/2_issue_requests_for_computing_totals.sh
 
 $ chmod u+x scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
 $ scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
+
+# Create an empty database from scratch.
+
+$ chmod u+x scripts/4_issue_requests_for_computing_totals_and_converting.sh
+$ scripts/4_issue_requests_for_computing_totals_and_converting.sh
 ```
 
 
