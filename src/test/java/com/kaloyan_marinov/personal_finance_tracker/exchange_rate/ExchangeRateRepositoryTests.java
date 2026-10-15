@@ -15,11 +15,13 @@ import jakarta.validation.ConstraintViolationException;
 // These tests bypass the endpoints (and thereby the validation on the request records),
 // so as to check the guarantees given by the entity and by the database.
 @SpringBootTest(
-	properties = {
-		"spring.datasource.url=jdbc:h2:mem:test",
-		"spring.jpa.hibernate.ddl-auto=none",
-		"spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql"
-	}
+    properties = {
+        "spring.datasource.url=jdbc:h2:mem:test",
+        "spring.jpa.hibernate.ddl-auto=none",
+        "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
+        "pft.security.user.name=application-user-for-test-suite-u",
+        "pft.security.user.password=application-user-for-test-suite-p"
+    }
 )
 @Transactional
 class ExchangeRateRepositoryTests {

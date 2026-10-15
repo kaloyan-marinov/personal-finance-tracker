@@ -15,11 +15,13 @@ import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(
-	properties = {
-		"spring.datasource.url=jdbc:h2:mem:test",
-		"spring.jpa.hibernate.ddl-auto=none",
-		"spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql"
-	}
+    properties = {
+        "spring.datasource.url=jdbc:h2:mem:test",
+        "spring.jpa.hibernate.ddl-auto=none",
+        "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
+        "pft.security.user.name=application-user-for-test-suite-u",
+        "pft.security.user.password=application-user-for-test-suite-p"
+    }
 )
 @AutoConfigureRestTestClient
 @Transactional

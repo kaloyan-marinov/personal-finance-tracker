@@ -118,12 +118,16 @@ with Maven
 # After that sub-shell exits, no environment variables will remain set in the parent shell process.
 #
 # The first statement = Turn on the shell's "allexport" (auto-export) option.
+# The command-line argument is NOT required
+# but, when used, can help confirm which filter is rejecting an incoming HTTP request.
+
 $ (
     set -a ;
 
     source ./.env ;
 
-    ./mvnw spring-boot:run ;
+    ./mvnw spring-boot:run \
+        -Dspring-boot.run.arguments=--logging.level.org.springframework.security=TRACE ;
 )
 
 # ...
@@ -197,6 +201,17 @@ $ scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
 
 $ chmod u+x scripts/4_issue_requests_for_computing_totals_and_converting.sh
 $ scripts/4_issue_requests_for_computing_totals_and_converting.sh
+
+# Create an empty database from scratch.
+
+$ chmod u+x scripts/5_issue_requests_for_tokens.sh
+$ (
+    set -a ;
+
+    source .env ;
+
+    scripts/5_issue_requests_for_tokens.sh ;
+)
 ```
 
 
