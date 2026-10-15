@@ -14,8 +14,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 )
 class PersonalFinanceTrackerApplicationTests {
 
-	@Test
-	void contextLoads() {
-	}
+    @Test
+    void contextLoads() {
+    }
 
 }
