@@ -1,5 +1,11 @@
 package com.kaloyan_marinov.personal_finance_tracker.token;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Base64;
+
 import org.junit.jupiter.api.Assertions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
@@ -9,6 +15,8 @@ import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTe
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
@@ -19,7 +27,8 @@ import org.springframework.test.web.servlet.client.RestTestClient;
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
         "pft.security.user.name=application-user-for-test-suite-u",
-        "pft.security.user.password=application-user-for-test-suite-p"
+        "pft.security.user.password=application-user-for-test-suite-p",
+        "pft.security.secret.key=secret-value-that-must-be-of-at-least-256-bits-aka-32-bytes"
     }
 )
 @AutoConfigureRestTestClient
@@ -36,6 +45,9 @@ class TokenControllerTests {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private JwtDecoder jwtDecoder;
 
     @Test
     void create_1() {
@@ -115,8 +127,8 @@ class TokenControllerTests {
 
     @Test
     void create_5() {
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/tokens")
             .headers(
                 h -> h.setBasicAuth(
@@ -125,9 +137,110 @@ class TokenControllerTests {
                 )
             )
             .exchange()
-            .expectStatus().isNoContent()
-            .expectBody().isEmpty()
         ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$.length()").isEqualTo(1)
+            .jsonPath("$.accessToken").value(
+                v -> Assertions.assertInstanceOf(
+                    String.class,
+                    v
+                )
+            )
+        ;
+    }
+
+    @Test
+    void create_6() {
+        // Arrange.
+        Instant instantBefore = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+
+        // Act.
+        TokenResponse tokenResponse = restTestClient
+            .post().uri("/api/v1/tokens")
+            .headers(
+                h -> h.setBasicAuth(
+                    "application-user-for-test-suite-u",
+                    "application-user-for-test-suite-p"
+                )
+            )
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody(TokenResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+        String accessToken = tokenResponse.accessToken();
+
+        Instant instantAfter = Instant.now();
+
+        Jwt jwt = jwtDecoder.decode(accessToken);
+
+        // Assert.
+        Assertions.assertEquals(
+            "HS256",
+            jwt.getHeaders().get("alg")
+        );
+        Assertions.assertEquals(
+            1L,
+            (
+                (Number) jwt.getClaim("userId")
+            ).longValue()
+        );
+
+        Instant instantOfExpiration = jwt.getExpiresAt();
+
+        Assertions.assertFalse(
+            instantOfExpiration.isBefore(
+                instantBefore.plus(Duration.ofHours(1))
+            )
+        );
+        Assertions.assertFalse(
+            instantOfExpiration.isAfter(
+                instantAfter.plus(Duration.ofHours(1))
+            )
+        );
+    }
+
+    /*
+    The payload of a JWT is only `base64`-encoded (not encrypted),
+    so it must not contain the password of the application user.
+    */
+    @Test
+    void create_7() {
+        // Act.
+        TokenResponse tokenResponse = restTestClient
+            .post().uri("/api/v1/tokens")
+            .headers(
+                h -> h.setBasicAuth(
+                    "application-user-for-test-suite-u",
+                    "application-user-for-test-suite-p"
+                )
+            )
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody(TokenResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+        String accessToken = tokenResponse.accessToken();
+
+        // Assert.
+        String encodedPayload = accessToken.split("\\.")[1];
+        String payload = new String(
+            Base64.getUrlDecoder().decode(encodedPayload),
+            StandardCharsets.UTF_8
+        );
+
+        Assertions.assertTrue(
+            payload.contains("application-user-for-test-suite-u")
+        );
+        Assertions.assertFalse(
+            payload.contains("application-user-for-test-suite-p")
+        );
     }
 
 }

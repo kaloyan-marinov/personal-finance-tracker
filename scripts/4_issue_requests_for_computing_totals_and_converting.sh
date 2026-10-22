@@ -11,6 +11,18 @@
 # when the string it runs contains data you don't control (script arguments, env vars, HTTP responses);
 # here, every cmd="..." is a fixed string written into the script.
 
+TKN=$(
+    set -a ;
+    source .env ;
+    http \
+        --print=b \
+        --auth "${PFT_SECURITY_USER_NAME}:${PFT_SECURITY_USER_PASSWORD}" \
+        POST localhost:8080/api/v1/tokens \
+        | jq \
+            --raw-output \
+            '.accessToken'
+)
+
 compute_totals() {
     # Guard against a missing year.
     local year="${1:?usage: compute_totals <year> [currency]}"
@@ -18,16 +30,19 @@ compute_totals() {
 
     if [ -z "$currency" ]; then
         http \
-            "localhost:8080/api/v1/totals?year=$year"
+            "localhost:8080/api/v1/totals?year=$year" \
+            Authorization:"Bearer ${TKN}"
     else
         http \
-            "localhost:8080/api/v1/totals?year=$year&currency=$currency"
+            "localhost:8080/api/v1/totals?year=$year&currency=$currency" \
+            Authorization:"Bearer ${TKN}"
     fi
 }
 
 create_exchange_rate() {
     http POST \
         localhost:8080/api/v1/exchange-rates \
+        Authorization:"Bearer ${TKN}" \
         "$@"
 }
 

@@ -10,9 +10,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
 
 @SpringBootTest(
     properties = {
@@ -20,19 +23,46 @@ import org.springframework.transaction.annotation.Transactional;
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
         "pft.security.user.name=application-user-for-test-suite-u",
-        "pft.security.user.password=application-user-for-test-suite-p"
+        "pft.security.user.password=application-user-for-test-suite-p",
+        "pft.security.secret.key=secret-value-that-must-be-of-at-least-256-bits-aka-32-bytes"
     }
 )
 @AutoConfigureRestTestClient
+/*
+The following annotation is required,
+because it creates a `MockMvc` bean that has the security filter chain,
+and then the `RestTestClient` binds to the created `MockMvc` bean.
+*/
+@AutoConfigureMockMvc
 @Transactional
 class TransactionControllerTests {
 
     @Autowired 
     private RestTestClient restTestClient;
 
+    private String obtainAccessToken() {
+        TokenResponse tokenResponse = restTestClient
+            .post().uri("/api/v1/tokens")
+            .headers(
+                h -> h.setBasicAuth(
+                    "application-user-for-test-suite-u",
+                    "application-user-for-test-suite-p"
+                )
+            )
+            .exchange()
+            .expectBody(TokenResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
+        return tokenResponse.accessToken();
+    }
+
     @Test
     void create_1() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2001;
         BigDecimal amount = null;
         String currency = "EUR";
@@ -56,6 +86,9 @@ class TransactionControllerTests {
 
         restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isBadRequest()
@@ -68,6 +101,8 @@ class TransactionControllerTests {
     @Test
     void create_2() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2002;
         BigDecimal amount = new BigDecimal("-4.789");
         String currency = "EUR";
@@ -91,6 +126,9 @@ class TransactionControllerTests {
 
         restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isBadRequest()
@@ -108,11 +146,13 @@ class TransactionControllerTests {
      */
     @Test
     void create_3() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+        int year = 2003;
+        BigDecimal amount = new BigDecimal("-300.00");
+        String currency = "EUR";
+
         for (String description : new String[] {null, "", " "}) {
-            // Arrange.
-            int year = 2003;
-            BigDecimal amount = new BigDecimal("-300.00");
-            String currency = "EUR";
             TransactionRequest transactionRequest = new TransactionRequest(
                 year,
                 amount,
@@ -132,6 +172,9 @@ class TransactionControllerTests {
 
             restTestClient
                 .post().uri("/api/v1/transactions")
+                .headers(
+                    h -> h.setBearerAuth(accessToken)
+                )
                 .body(transactionRequest)
                 .exchange()
                 .expectStatus().isBadRequest()
@@ -145,6 +188,8 @@ class TransactionControllerTests {
     @Test
     void create_4() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2004;
         BigDecimal amount = new BigDecimal("-400.00");
         String currency = null;
@@ -168,6 +213,9 @@ class TransactionControllerTests {
 
         restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isBadRequest()
@@ -184,11 +232,14 @@ class TransactionControllerTests {
      */
     @Test
     void create_5() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
+        int year = 2005;
+        BigDecimal amount = new BigDecimal("-500.00");
+        String description = "groceries";
+        
         for (String currency : new String[] {"", "eur", "Eur", "EU", "EURO", "E1R"}) {
-            // Arrange.
-            int year = 2005;
-            BigDecimal amount = new BigDecimal("-500.00");
-            String description = "groceries";
             TransactionRequest transactionRequest = new TransactionRequest(
                 year,
                 amount,
@@ -208,6 +259,9 @@ class TransactionControllerTests {
 
             restTestClient
                 .post().uri("/api/v1/transactions")
+                .headers(
+                    h -> h.setBearerAuth(accessToken)
+                )
                 .body(transactionRequest)
                 .exchange()
                 .expectStatus().isBadRequest()
@@ -221,6 +275,8 @@ class TransactionControllerTests {
     @Test
     void create_6() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2006;
         BigDecimal amount = new BigDecimal("-600.00");
         String currency = "EUR";
@@ -244,6 +300,9 @@ class TransactionControllerTests {
 
         restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isBadRequest()
@@ -262,6 +321,8 @@ class TransactionControllerTests {
     @Test
     void create_7() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2007;
         BigDecimal amount = new BigDecimal("-700.00");
         String currency = "CHF";
@@ -276,6 +337,9 @@ class TransactionControllerTests {
         // Act.
         Transaction transaction = restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
@@ -302,6 +366,9 @@ class TransactionControllerTests {
 
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -318,6 +385,8 @@ class TransactionControllerTests {
     @Test
     void create_8() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2008;
         BigDecimal amount = new BigDecimal("-800.00");
         String currency = "EUR";
@@ -331,6 +400,9 @@ class TransactionControllerTests {
 
         Transaction transaction = restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
@@ -352,6 +424,9 @@ class TransactionControllerTests {
         // Act.
         Transaction newTransaction = restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(newTransactionRequestWithId)
             .exchange()
             .expectStatus().isCreated()
@@ -380,6 +455,9 @@ class TransactionControllerTests {
         );
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -391,11 +469,16 @@ class TransactionControllerTests {
     @Test
     void retrieveOne_1() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         long nonexistentId = 17;
 
         // Act + Assert.
         restTestClient
             .get().uri("/api/v1/transactions/" + nonexistentId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isNotFound()
             .expectBody().isEmpty();
@@ -404,6 +487,8 @@ class TransactionControllerTests {
     @Test
     void retrieveOne_2() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2002;
         BigDecimal amount = new BigDecimal("-200.00");
         String currency = "EUR";
@@ -417,6 +502,9 @@ class TransactionControllerTests {
 
         Transaction transaction = restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
@@ -438,6 +526,9 @@ class TransactionControllerTests {
 
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -449,6 +540,8 @@ class TransactionControllerTests {
     @Test
     void retrieveAll_1() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         String expectedBodyJSON = """
             []
         """;
@@ -456,6 +549,9 @@ class TransactionControllerTests {
         // Act + Assert.
         restTestClient
             .get().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -467,6 +563,8 @@ class TransactionControllerTests {
     @Test
     void retrieveAll_2() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year6 = 2006;
         BigDecimal amount6 = new BigDecimal("-600.00");
         String currency6 = "EUR";
@@ -491,6 +589,9 @@ class TransactionControllerTests {
 
         Transaction transaction6 = restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest6)
             .exchange()
             .expectStatus().isCreated()
@@ -500,6 +601,9 @@ class TransactionControllerTests {
         
         Transaction transaction7 = restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest7)
             .exchange()
             .expectStatus().isCreated()
@@ -532,6 +636,9 @@ class TransactionControllerTests {
 
         restTestClient
             .get().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -543,6 +650,8 @@ class TransactionControllerTests {
     @Test
     void update_1() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 3000 + 2003;
         BigDecimal amount = new BigDecimal(
             String.valueOf(-(3000 + 300.00))
@@ -558,6 +667,9 @@ class TransactionControllerTests {
 
         Transaction transaction = restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
@@ -589,6 +701,9 @@ class TransactionControllerTests {
 
         restTestClient
             .put().uri("/api/v1/transactions/" + transactionId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(updateRequest)
             .exchange()
             .expectStatus().isBadRequest()
@@ -609,6 +724,9 @@ class TransactionControllerTests {
 
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -620,6 +738,8 @@ class TransactionControllerTests {
     @Test
     void update_2() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2004;
         BigDecimal amount = new BigDecimal("-400.00");
         String currency = "EUR";
@@ -636,6 +756,9 @@ class TransactionControllerTests {
         // Arrange + Act.
         restTestClient
             .put().uri("/api/v1/transactions/" + nonexistentId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isNotFound()
@@ -645,6 +768,8 @@ class TransactionControllerTests {
     @Test
     void update_3() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 3000 + 2005;
         BigDecimal amount = new BigDecimal(
             String.valueOf(-(3000 + 500.00))
@@ -660,6 +785,9 @@ class TransactionControllerTests {
 
         Transaction transaction = restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
@@ -692,6 +820,9 @@ class TransactionControllerTests {
 
         restTestClient
             .put().uri("/api/v1/transactions/" + transactionId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(updateTransactionRequest)
             .exchange()
             .expectStatus().isOk()
@@ -702,6 +833,9 @@ class TransactionControllerTests {
         
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -713,11 +847,16 @@ class TransactionControllerTests {
     @Test
     void delete_1() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         long nonexistentId = 17;
 
         // Act + Assert.
         restTestClient
             .delete().uri("/api/v1/transactions/" + nonexistentId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isNotFound()
             .expectBody().isEmpty();
@@ -726,6 +865,8 @@ class TransactionControllerTests {
     @Test
     void delete_2() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2006;
         BigDecimal amount = new BigDecimal("-600.00");
         String currency = "EUR";
@@ -739,6 +880,9 @@ class TransactionControllerTests {
 
         Transaction transaction = restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
@@ -750,12 +894,18 @@ class TransactionControllerTests {
         // Act + Assert.
         restTestClient
             .delete().uri("/api/v1/transactions/" + transactionId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isNoContent()
             .expectBody().isEmpty();
         
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isNotFound()
             .expectBody().isEmpty();

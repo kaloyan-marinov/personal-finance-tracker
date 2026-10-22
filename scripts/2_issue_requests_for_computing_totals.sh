@@ -1,10 +1,23 @@
 #!/usr/bin/env bash
 
+TKN=$(
+    set -a ;
+    source .env ;
+    http \
+        --print=b \
+        --auth "${PFT_SECURITY_USER_NAME}:${PFT_SECURITY_USER_PASSWORD}" \
+        POST localhost:8080/api/v1/tokens \
+        | jq \
+            --raw-output \
+            '.accessToken'
+)
+
 # The data below is meant to look realistic,
 # but it does not belong to a real person.
 
 http POST \
     localhost:8080/api/v1/transactions \
+    Authorization:"Bearer ${TKN}" \
     year:=2025 \
     amount:=90123 \
     currency=CHF \
@@ -12,6 +25,7 @@ http POST \
 
 http POST \
     localhost:8080/api/v1/transactions \
+    Authorization:"Bearer ${TKN}" \
     year:=2025 \
     amount:=-5678 \
     currency=CHF \
@@ -19,6 +33,7 @@ http POST \
 
 http POST \
     localhost:8080/api/v1/transactions \
+    Authorization:"Bearer ${TKN}" \
     year:=2025 \
     amount:=-1700 \
     currency=CHF \
@@ -26,6 +41,7 @@ http POST \
 
 http POST \
     localhost:8080/api/v1/transactions \
+    Authorization:"Bearer ${TKN}" \
     year:=2025 \
     amount:=-12345 \
     currency=CHF \
@@ -35,6 +51,7 @@ http POST \
 
 http POST \
     localhost:8080/api/v1/transactions \
+    Authorization:"Bearer ${TKN}" \
     year:=2025 \
     amount:=-400 \
     currency=EUR \
@@ -42,6 +59,7 @@ http POST \
 
 http POST \
     localhost:8080/api/v1/transactions \
+    Authorization:"Bearer ${TKN}" \
     year:=2025 \
     amount:=-2000 \
     currency=EUR \
@@ -51,6 +69,7 @@ http POST \
 
 http POST \
     localhost:8080/api/v1/transactions \
+    Authorization:"Bearer ${TKN}" \
     year:=2025 \
     amount:=-$((8 * 70)) \
     currency=CHF \
@@ -58,6 +77,7 @@ http POST \
 
 http POST \
     localhost:8080/api/v1/transactions \
+    Authorization:"Bearer ${TKN}" \
     year:=2025 \
     amount:=-180 \
     currency=EUR \
@@ -65,6 +85,7 @@ http POST \
 
 http POST \
     localhost:8080/api/v1/transactions \
+    Authorization:"Bearer ${TKN}" \
     year:=2025 \
     amount:=-50 \
     currency=CHF \
@@ -74,4 +95,5 @@ http POST \
 
 http \
     'localhost:8080/api/v1/totals?year=2025' \
+    Authorization:"Bearer ${TKN}" \
     --verbose

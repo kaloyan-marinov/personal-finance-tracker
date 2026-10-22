@@ -9,7 +9,8 @@ import org.springframework.boot.test.context.SpringBootTest;
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
         "pft.security.user.name=application-user-for-test-suite-u",
-        "pft.security.user.password=application-user-for-test-suite-p"
+        "pft.security.user.password=application-user-for-test-suite-p",
+        "pft.security.secret.key=secret-value-that-must-be-of-at-least-256-bits-aka-32-bytes"
     }
 )
 class PersonalFinanceTrackerApplicationTests {

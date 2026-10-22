@@ -14,6 +14,57 @@ as well as computing one's net worth (as of a given year).
 
 
 
+# run the test suite
+
+```shell
+$ ./mvnw test
+```
+
+To run a single test case (with more logging output):
+
+```shell
+# The Surefire plugin passes `-D` properties on to the test JVM
+# (and Spring Boot reads them, so the `logging.level.*` overrides apply).
+#
+# `-q` hides Maven's own output but not your application's log output.
+$ ./mvnw \
+    -q \
+    test \
+    -Dtest=TransactionControllerTests#create_1 \
+    -Dlogging.level.org.springframework.security=DEBUG \
+    -Dlogging.level.org.springframework.web=TRACE \
+    -Dlogging.level.org.springframework.test=DEBUG
+```
+
+```shell
+# Maven reads the whole command line before it runs anything.
+# It collects every `-q` and `-D...` into its settings
+# and every bare word into the list of things to run.
+# A bare word can be a lifecycle phase (`test`, `clean`, `package` and so on)
+# or a plugin goal (`dependency:tree` and so on).
+#
+# So, the order of flags relative to `test` doesn't matter,
+# which means that the preceding command and the following command run identically.
+#
+# (
+# As an FYI:
+#
+# A commonly used pattern is `tool [options] goal`.
+# With the goal alone on the last line,
+# the thing being run is easy to spot,
+# and each line above it is one flag you can add, remove or comment out.
+# )
+$ ./mvnw \
+    -q \
+    -Dtest=TransactionControllerTests#create_1 \
+    -Dlogging.level.org.springframework.security=DEBUG \
+    -Dlogging.level.org.springframework.web=TRACE \
+    -Dlogging.level.org.springframework.test=DEBUG \
+    test
+```
+
+
+
 # configure
 
 ```shell
@@ -184,24 +235,6 @@ Use another terminal window to issue these HTTP requests:
 # The following will work
 # only if the HTTPie command line tool is installed on your machine.
 
-$ chmod u+x scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
-$ scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
-
-# Create an empty database from scratch.
-
-$ chmod u+x scripts/2_issue_requests_for_computing_totals.sh
-$ scripts/2_issue_requests_for_computing_totals.sh
-
-# Create an empty database from scratch.
-
-$ chmod u+x scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
-$ scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
-
-# Create an empty database from scratch.
-
-$ chmod u+x scripts/4_issue_requests_for_computing_totals_and_converting.sh
-$ scripts/4_issue_requests_for_computing_totals_and_converting.sh
-
 # Create an empty database from scratch.
 
 $ chmod u+x scripts/5_issue_requests_for_tokens.sh
@@ -211,6 +244,48 @@ $ (
     source .env ;
 
     scripts/5_issue_requests_for_tokens.sh ;
+)
+
+$ chmod u+x scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
+$ (
+    set -a ;
+
+    source .env ;
+
+    scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh ;
+)
+
+# Create an empty database from scratch.
+
+$ chmod u+x scripts/2_issue_requests_for_computing_totals.sh
+$ (
+    set -a ;
+
+    source .env ;
+
+    scripts/2_issue_requests_for_computing_totals.sh ;
+)
+
+# Create an empty database from scratch.
+
+$ chmod u+x scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
+$ (
+    set -a ;
+
+    source .env ;
+
+    scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh ;
+)
+
+# Create an empty database from scratch.
+
+$ chmod u+x scripts/4_issue_requests_for_computing_totals_and_converting.sh
+$ (
+    set -a ;
+
+    source .env ;
+
+    scripts/4_issue_requests_for_computing_totals_and_converting.sh ;
 )
 ```
 

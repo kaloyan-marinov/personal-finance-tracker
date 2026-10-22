@@ -1,8 +1,14 @@
 package com.kaloyan_marinov.personal_finance_tracker;
 
+import java.nio.charset.StandardCharsets;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -15,33 +21,55 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    @Order(1)
+    public SecurityFilterChain securityFilterChainForBasicAuth(HttpSecurity http) throws Exception {
         http
-            // Spring Security turns «CSRF protection» on by default.
-            // For a REST API called by non-browser clients, you can disable it as follows:
-            .csrf(csrf -> csrf.disable())
-            // https://docs.spring.io/spring-security/reference/servlet/authentication/session-management.html#stateless-authentication
-            // Sometimes there is no need to create and maintain [an] `HttpSession`
-            // [in order] to persist the authentication across requests.
-            // Some authentication mechanisms (like HTTP Basic)
-            // are stateless and, therefore, re-authenticates the user on every request.
-            .sessionManagement(
-                s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            .securityMatcher("/api/v1/tokens")
+            .authorizeHttpRequests((authorize) -> authorize
+                .anyRequest().authenticated()
             )
-            .authorizeHttpRequests((authorize) ->
-                authorize
-                    .requestMatchers("/api/v1/tokens").authenticated()
-                    .anyRequest().permitAll()
+            .csrf((csrf) -> csrf.disable())
+            .httpBasic(Customizer.withDefaults())
+            .sessionManagement((session) -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        ;
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
+    public SecurityFilterChain securityFilterChainForBearerAuth(HttpSecurity http) throws Exception {
+        http
+            // Notice that no call to `securityMatcher` is made here:
+            // this «security filter chain» catches every request not matched by the other «security filter chain»,
+            // so any endpoint (including ones added later) requires a Bearer token by default.
+            .authorizeHttpRequests((authorize) -> authorize
+                .anyRequest().authenticated()
             )
-            .httpBasic(Customizer.withDefaults());
+            .csrf((csrf) -> csrf.disable())
+            // The following call also configures the `ExceptionTranslationFilter`
+            // within this «security filter chain» to respond
+            // via a `BearerTokenAuthenticationEntryPoint` (401 + `WWW-Authenticate: Bearer ...`)
+            // and via a `BearerTokenAccessDeniedHandler` (403),
+            // so there is no need to configure those explicitly by calling `.exceptionHandling`.
+            .oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()))
+            .sessionManagement((session) -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        ;
 
         return http.build();
     }
@@ -94,6 +122,47 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    }
+
+    @Bean
+    SecretKey secretKey(
+        @Value("${pft.security.secret.key}") String secret
+    ) {
+        if (secret.isBlank()) {
+            throw new IllegalStateException(
+                "PFT_SECURITY_SECRET_KEY may not be set to an empty string & may not be made only of spaces"
+            );
+        }
+
+        byte[] bytesThatRepresentSecret = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytesThatRepresentSecret.length < 32) {
+            throw new IllegalStateException(
+                "PFT_SECURITY_SECRET_KEY must be at least 256 bits (32 bytes) long, as required by HS256"
+            );
+        }
+
+        SecretKeySpec secretKeySpec = new SecretKeySpec(
+            bytesThatRepresentSecret,
+            "HmacSHA256"
+        );
+
+        return secretKeySpec;
+    }
+
+    @Bean
+    JwtEncoder jwtEncoder(SecretKey secretKey) {
+        return new NimbusJwtEncoder(
+            new ImmutableSecret<>(secretKey)
+        );
+    }
+
+    @Bean
+    JwtDecoder jwtDecoder(SecretKey secretKey) {
+        return NimbusJwtDecoder
+            .withSecretKey(secretKey)
+            .macAlgorithm(MacAlgorithm.HS256)
+            .build()
+        ;
     }
 
 }

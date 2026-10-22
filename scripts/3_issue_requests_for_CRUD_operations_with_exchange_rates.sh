@@ -12,9 +12,22 @@
 # An exchange rate is addressed by its natural key, `<year> <sourceCurrency> <targetCurrency>`,
 # which plays the role that `<id>` plays for transactions.
 
+TKN=$(
+    set -a ;
+    source .env ;
+    http \
+        --print=b \
+        --auth "${PFT_SECURITY_USER_NAME}:${PFT_SECURITY_USER_PASSWORD}" \
+        POST localhost:8080/api/v1/tokens \
+        | jq \
+            --raw-output \
+            '.accessToken'
+)
+
 create_exchange_rate() {
     http POST \
         localhost:8080/api/v1/exchange-rates \
+        Authorization:"Bearer ${TKN}" \
         "$@"
 }
 
@@ -25,12 +38,14 @@ retrieve_one_exchange_rate() {
     local target_currency="${3:?usage: retrieve_one_exchange_rate <year> <sourceCurrency> <targetCurrency>}"
 
     http \
-        "localhost:8080/api/v1/exchange-rates/$year/$source_currency/$target_currency"
+        "localhost:8080/api/v1/exchange-rates/$year/$source_currency/$target_currency" \
+        Authorization:"Bearer ${TKN}"
 }
 
 retrieve_exchange_rates() {
     http \
-        localhost:8080/api/v1/exchange-rates
+        localhost:8080/api/v1/exchange-rates \
+        Authorization:"Bearer ${TKN}"
 }
 
 update_exchange_rate() {
@@ -46,6 +61,7 @@ update_exchange_rate() {
 
     http PUT \
         "localhost:8080/api/v1/exchange-rates/$year/$source_currency/$target_currency" \
+        Authorization:"Bearer ${TKN}" \
         "$@"
 }
 
@@ -56,7 +72,8 @@ delete_exchange_rate() {
     local target_currency="${3:?usage: delete_exchange_rate <year> <sourceCurrency> <targetCurrency>}"
 
     http DELETE \
-        "localhost:8080/api/v1/exchange-rates/$year/$source_currency/$target_currency"
+        "localhost:8080/api/v1/exchange-rates/$year/$source_currency/$target_currency" \
+        Authorization:"Bearer ${TKN}"
 }
 
 

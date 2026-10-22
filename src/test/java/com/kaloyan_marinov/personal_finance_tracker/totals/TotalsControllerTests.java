@@ -9,12 +9,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.kaloyan_marinov.personal_finance_tracker.exchange_rate.ExchangeRateRequestCreate;
+import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
 import com.kaloyan_marinov.personal_finance_tracker.transaction.Transaction;
 import com.kaloyan_marinov.personal_finance_tracker.transaction.TransactionRequest;
 
@@ -24,18 +26,46 @@ import com.kaloyan_marinov.personal_finance_tracker.transaction.TransactionReque
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
         "pft.security.user.name=application-user-for-test-suite-u",
-        "pft.security.user.password=application-user-for-test-suite-p"
+        "pft.security.user.password=application-user-for-test-suite-p",
+        "pft.security.secret.key=secret-value-that-must-be-of-at-least-256-bits-aka-32-bytes"
     }
 )
 @AutoConfigureRestTestClient
+/*
+The following annotation is required,
+because it creates a `MockMvc` bean that has the security filter chain,
+and then the `RestTestClient` binds to the created `MockMvc` bean.
+*/
+@AutoConfigureMockMvc
 @Transactional
 class TotalsControllerTests {
 
     @Autowired
     private RestTestClient restTestClient;
 
+    private String obtainAccessToken() {
+        TokenResponse tokenResponse = restTestClient
+            .post().uri("/api/v1/tokens")
+            .headers(
+                h -> h.setBasicAuth(
+                    "application-user-for-test-suite-u",
+                    "application-user-for-test-suite-p"
+                )
+            )
+            .exchange()
+            .expectBody(TokenResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
+        return tokenResponse.accessToken();
+    }
+
     @Test
     void computeTotals_01() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
         // Act + Assert.
         String expectedBodyJSON = """
             {
@@ -48,6 +78,9 @@ class TotalsControllerTests {
 
         restTestClient
             .get().uri("/api/v1/totals")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isBadRequest()
             .expectBody().json(
@@ -59,6 +92,8 @@ class TotalsControllerTests {
     @Test
     void computeTotals_02() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         String nonIntegerYear = "abc";
 
         // Act + Assert.
@@ -72,7 +107,10 @@ class TotalsControllerTests {
         """;
 
         restTestClient
-            .get().uri("/api/v1/totals?year=" + nonIntegerYear )
+            .get().uri("/api/v1/totals?year=" + nonIntegerYear)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isBadRequest()
             .expectBody().json(
@@ -84,13 +122,18 @@ class TotalsControllerTests {
     @Test
     void computeTotals_03() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2030;
 
-        createTransaction(year - 1, "-10.00", "EUR");
+        createTransaction(accessToken, year - 1, "-10.00", "EUR");
 
         // Act.
         TotalsResponse observed = restTestClient
             .get().uri("/api/v1/totals?year=" + year)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody(TotalsResponse.class)
@@ -116,20 +159,25 @@ class TotalsControllerTests {
     @Test
     void computeTotals_04() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2026;
 
-        createTransaction(year, "-10.00", "EUR");
-        createTransaction(year, "-20.00", "EUR");
-        createTransaction(year, "300.00", "EUR");
+        createTransaction(accessToken, year, "-10.00", "EUR");
+        createTransaction(accessToken, year, "-20.00", "EUR");
+        createTransaction(accessToken, year, "300.00", "EUR");
 
-        createTransaction(year, "-400.00", "USD");
+        createTransaction(accessToken, year, "-400.00", "USD");
 
-        createTransaction(year, "5000.00", "CHF");
-        createTransaction(year, "6000.00", "CHF");
+        createTransaction(accessToken, year, "5000.00", "CHF");
+        createTransaction(accessToken, year, "6000.00", "CHF");
 
         // Act.
         TotalsResponse observed = restTestClient
             .get().uri("/api/v1/totals?year=" + year)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody(TotalsResponse.class)
@@ -163,18 +211,23 @@ class TotalsControllerTests {
     @Test
     void computeTotals_05() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2026;
 
-        createTransaction(year, "100.00", "EUR");
-        createTransaction(year, "-20.00", "EUR");
+        createTransaction(accessToken, year, "100.00", "EUR");
+        createTransaction(accessToken, year, "-20.00", "EUR");
 
-        createTransaction(year, "0.00", "JPY");
+        createTransaction(accessToken, year, "0.00", "JPY");
 
-        createTransaction(year + 1, "-70000.00", "EUR");
+        createTransaction(accessToken, year + 1, "-70000.00", "EUR");
 
         // Act.
         TotalsResponse observed = restTestClient
             .get().uri("/api/v1/totals?year=" + year)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody(TotalsResponse.class)
@@ -205,14 +258,19 @@ class TotalsControllerTests {
     @Test
     void computeTotals_06() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2030;
         String currencyToReportTotalsIn = "EUR";
 
-        createTransaction(year - 1, "-10.00", "USD");
+        createTransaction(accessToken, year - 1, "-10.00", "USD");
 
         // Act.
         TotalsResponse observed = restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody(TotalsResponse.class)
@@ -239,6 +297,9 @@ class TotalsControllerTests {
      */
     @Test
     void computeTotals_07() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
         // Act + Assert.
         String expectedBodyJSON = """
             {
@@ -251,6 +312,9 @@ class TotalsControllerTests {
 
         restTestClient
             .get().uri("/api/v1/totals?year=2026&currency=")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isBadRequest()
             .expectBody().json(
@@ -269,6 +333,8 @@ class TotalsControllerTests {
     @Test
     void computeTotals_08() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         String currencyToReportTotalsIn = "eur";
 
         // Act + Assert.
@@ -283,6 +349,9 @@ class TotalsControllerTests {
 
         restTestClient
             .get().uri("/api/v1/totals?year=2026&currency=" + currencyToReportTotalsIn)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isBadRequest()
             .expectBody().json(
@@ -306,14 +375,17 @@ class TotalsControllerTests {
     @Test
     void computeTotals_09() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2026;
         String currencyToReportTotalsIn = "EUR";
 
-        createTransaction(year, "-10.00", currencyToReportTotalsIn);
-        createTransaction(year, "-20.00", "USD");
-        createTransaction(year, "30.00", "CHF");
+        createTransaction(accessToken, year, "-10.00", currencyToReportTotalsIn);
+        createTransaction(accessToken, year, "-20.00", "USD");
+        createTransaction(accessToken, year, "30.00", "CHF");
 
         createExchangeRate(
+            accessToken,
             year,
             currencyToReportTotalsIn,
             "USD",
@@ -321,6 +393,7 @@ class TotalsControllerTests {
         );
 
         createExchangeRate(
+            accessToken,
             year - 1,
             "CHF",
             currencyToReportTotalsIn,
@@ -328,12 +401,14 @@ class TotalsControllerTests {
         );
 
         createExchangeRate(
+            accessToken,
             year,
             "USD",
             "GBP",
             "0.75"
         );
         createExchangeRate(
+            accessToken,
             year,
             "GBP",
             currencyToReportTotalsIn,
@@ -353,6 +428,9 @@ class TotalsControllerTests {
 
         restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT)
             .expectBody().json(
@@ -370,15 +448,20 @@ class TotalsControllerTests {
     @Test
     void computeTotals_10() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2026;
         String currencyToReportTotalsIn = "EUR";
 
-        createTransaction(year, "100.00", currencyToReportTotalsIn);
-        createTransaction(year, "200.50", currencyToReportTotalsIn);
+        createTransaction(accessToken, year, "100.00", currencyToReportTotalsIn);
+        createTransaction(accessToken, year, "200.50", currencyToReportTotalsIn);
 
         // Act.
         TotalsResponse observed = restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody(TotalsResponse.class)
@@ -403,18 +486,23 @@ class TotalsControllerTests {
     @Test
     void computeTotals_11() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2026;
         String currencyToReportTotalsIn = "GBP";
 
-        createTransaction(year, "-40.00", "EUR");
-        createTransaction(year, "80.00", "USD");
+        createTransaction(accessToken, year, "-40.00", "EUR");
+        createTransaction(accessToken, year, "80.00", "USD");
 
-        createExchangeRate(year, "EUR", currencyToReportTotalsIn, "0.85");
-        createExchangeRate(year, "USD", currencyToReportTotalsIn, "0.75");
+        createExchangeRate(accessToken, year, "EUR", currencyToReportTotalsIn, "0.85");
+        createExchangeRate(accessToken, year, "USD", currencyToReportTotalsIn, "0.75");
 
         // Act.
         TotalsResponse observed = restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody(TotalsResponse.class)
@@ -442,22 +530,27 @@ class TotalsControllerTests {
     @Test
     void computeTotals_12() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         int year = 2026;
         String currencyToReportTotalsIn = "EUR";
 
-        createTransaction(year, "-10.00", currencyToReportTotalsIn);
-        createTransaction(year, "-100.01", "USD");
-        createTransaction(year, "-100.01", "CHF");
+        createTransaction(accessToken, year, "-10.00", currencyToReportTotalsIn);
+        createTransaction(accessToken, year, "-100.01", "USD");
+        createTransaction(accessToken, year, "-100.01", "CHF");
 
-        createTransaction(year, "100.00", currencyToReportTotalsIn);
-        createTransaction(year, "100.01", "USD");
+        createTransaction(accessToken, year, "100.00", currencyToReportTotalsIn);
+        createTransaction(accessToken, year, "100.01", "USD");
 
-        createExchangeRate(year, "USD", currencyToReportTotalsIn, "0.5");
-        createExchangeRate(year, "CHF", currencyToReportTotalsIn, "0.5");
+        createExchangeRate(accessToken, year, "USD", currencyToReportTotalsIn, "0.5");
+        createExchangeRate(accessToken, year, "CHF", currencyToReportTotalsIn, "0.5");
 
         // Act.
         TotalsResponse observed = restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody(TotalsResponse.class)
@@ -482,7 +575,12 @@ class TotalsControllerTests {
         assertEquals(expected, observed);
     }
 
-    private void createTransaction(int year, String amount, String currency) {
+    private void createTransaction(
+        String accessToken,
+        int year,
+        String amount,
+        String currency
+    ) {
         TransactionRequest transactionRequest = new TransactionRequest(
             year,
             new BigDecimal(amount),
@@ -492,12 +590,16 @@ class TotalsControllerTests {
 
         restTestClient
             .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated();
     }
 
     private void createExchangeRate(
+        String accessToken,
         int year,
         String sourceCurrency,
         String targetCurrency,
@@ -512,6 +614,9 @@ class TotalsControllerTests {
 
         restTestClient
             .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(exchangeRateRequest)
             .exchange()
             .expectStatus().isCreated();

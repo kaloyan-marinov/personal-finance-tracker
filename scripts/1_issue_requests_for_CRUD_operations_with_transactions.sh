@@ -9,9 +9,22 @@
 # when the string it runs contains data you don't control (script arguments, env vars, HTTP responses);
 # here, every cmd="..." is a fixed string written into the script.
 
+TKN=$(
+    set -a ;
+    source .env ;
+    http \
+        --print=b \
+        --auth "${PFT_SECURITY_USER_NAME}:${PFT_SECURITY_USER_PASSWORD}" \
+        POST localhost:8080/api/v1/tokens \
+        | jq \
+            --raw-output \
+            '.accessToken'
+)
+
 create_transaction() {
     http POST \
         localhost:8080/api/v1/transactions \
+        Authorization:"Bearer ${TKN}" \
         "$@"
 }
 
@@ -20,12 +33,14 @@ retrieve_one_transaction() {
     local id="${1:?usage: retrieve_one_transaction <id> [http args...]}"
 
     http \
-        "localhost:8080/api/v1/transactions/$id"
+        "localhost:8080/api/v1/transactions/$id" \
+        Authorization:"Bearer ${TKN}"
 }
 
 retrieve_transactions() {
     http \
-        localhost:8080/api/v1/transactions
+        localhost:8080/api/v1/transactions \
+        Authorization:"Bearer ${TKN}"
 }
 
 update_transaction() {
@@ -38,6 +53,7 @@ update_transaction() {
 
     http PUT \
         "localhost:8080/api/v1/transactions/$id" \
+        Authorization:"Bearer ${TKN}" \
         "$@"
 }
 
@@ -46,26 +62,9 @@ delete_transaction() {
     local id="${1:?usage: delete_transaction <id> [http args...]}"
 
     http DELETE \
-        "localhost:8080/api/v1/transactions/$id"
+        "localhost:8080/api/v1/transactions/$id" \
+        Authorization:"Bearer ${TKN}"
 }
-
-add_up_underscore_separated_numbers() {
-    local total=0
-    local number_as_string
-
-    for number_as_string in "$@"; do
-        # Strip all underscores
-        number=${number_as_string//_/}
-
-        total=$((total + number))
-    done
-    
-    echo $total
-}
-
-#add_up_underscore_separated_numbers 1 2 3 4
-
-#add_up_underscore_separated_numbers 3_065.50
 
 
 N_SECONDS=1

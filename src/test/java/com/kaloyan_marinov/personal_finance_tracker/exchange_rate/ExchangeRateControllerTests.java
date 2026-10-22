@@ -6,9 +6,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
 
 @SpringBootTest(
     properties = {
@@ -16,21 +19,50 @@ import org.springframework.transaction.annotation.Transactional;
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
         "pft.security.user.name=application-user-for-test-suite-u",
-        "pft.security.user.password=application-user-for-test-suite-p"
+        "pft.security.user.password=application-user-for-test-suite-p",
+        "pft.security.secret.key=secret-value-that-must-be-of-at-least-256-bits-aka-32-bytes"
     }
 )
 @AutoConfigureRestTestClient
+/*
+The following annotation is required,
+because it creates a `MockMvc` bean that has the security filter chain,
+and then the `RestTestClient` binds to the created `MockMvc` bean.
+*/
+@AutoConfigureMockMvc
 @Transactional
 class ExchangeRateControllerTests {
 
     @Autowired
     private RestTestClient restTestClient;
 
+    private String obtainAccessToken() {
+        TokenResponse tokenResponse = restTestClient
+            .post().uri("/api/v1/tokens")
+            .headers(
+                h -> h.setBasicAuth(
+                    "application-user-for-test-suite-u",
+                    "application-user-for-test-suite-p"
+                )
+            )
+            .exchange()
+            .expectBody(TokenResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
+        return tokenResponse.accessToken();
+    }
+
     private ExchangeRate createExchangeRate(
+        String accessToken,
         ExchangeRateRequestCreate exchangeRateRequestCreate
     ) {
         return restTestClient
             .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(exchangeRateRequestCreate)
             .exchange()
             .expectStatus().isCreated()
@@ -46,6 +78,8 @@ class ExchangeRateControllerTests {
     @Test
     void create_1() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2001,
             "JPY",
@@ -54,7 +88,7 @@ class ExchangeRateControllerTests {
         );
 
         // Act.
-        ExchangeRate exchangeRate = createExchangeRate(exchangeRateRequestCreate);
+        ExchangeRate exchangeRate = createExchangeRate(accessToken, exchangeRateRequestCreate);
 
         // Assert.
         String expectedBodyJSON = """
@@ -69,6 +103,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2001/JPY/EUR")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -84,6 +121,8 @@ class ExchangeRateControllerTests {
     @Test
     void create_2() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         Integer year = 2002;
         String sourceCurrency = "EUR";
         String targetCurrency = "USD";
@@ -94,7 +133,7 @@ class ExchangeRateControllerTests {
             targetCurrency,
             new BigDecimal("1.085")
         );
-        createExchangeRate(exchangeRateRequestCreate);
+        createExchangeRate(accessToken, exchangeRateRequestCreate);
 
         
         // Act + Assert.
@@ -113,6 +152,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(duplicateExchRateReqCreate)
             .exchange()
             .expectStatus().isEqualTo(409)
@@ -129,6 +171,8 @@ class ExchangeRateControllerTests {
     @Test
     void create_3() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
             2003,
             "ABC",
@@ -143,8 +187,8 @@ class ExchangeRateControllerTests {
         );
 
         // Act + Assert.
-        createExchangeRate(exchangeRateRequestCreate1);
-        createExchangeRate(exchangeRateRequestCreate2);
+        createExchangeRate(accessToken, exchangeRateRequestCreate1);
+        createExchangeRate(accessToken, exchangeRateRequestCreate2);
     }
 
     /**
@@ -154,6 +198,8 @@ class ExchangeRateControllerTests {
     @Test
     void create_4() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             null,
             "EUR",
@@ -173,6 +219,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(exchangeRateRequestCreate)
             .exchange()
             .expectStatus().isBadRequest()
@@ -189,15 +238,19 @@ class ExchangeRateControllerTests {
      */
     @Test
     void create_5() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
+        Integer year = 2005;
         String trgtCurrency = "USD";
+        BigDecimal amount = new BigDecimal("1.085");
 
         for (String srcCurrency : new String[] {"", "eur", "Eur", "EU", "EURO", "E1R"}) {
-            // Arrange.
             ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-                2005,
+                year,
                 srcCurrency,
                 trgtCurrency,
-                new BigDecimal("1.085")
+                amount
             );
 
             // Act + Assert.
@@ -212,6 +265,9 @@ class ExchangeRateControllerTests {
 
             restTestClient
                 .post().uri("/api/v1/exchange-rates")
+                .headers(
+                    h -> h.setBearerAuth(accessToken)
+                )
                 .body(exchangeRateRequestCreate)
                 .exchange()
                 .expectStatus().isBadRequest()
@@ -229,15 +285,20 @@ class ExchangeRateControllerTests {
      */
     @Test
     void create_6() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
+        Integer year = 2006;
         String srcCurrency = "USD";
+        BigDecimal amount = new BigDecimal("0.92");
 
         for (String trgtCurrency : new String[] {"", "eur", "Eur", "EU", "EURO", "E1R"}) {
             // Arrange.
             ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-                2006,
+                year,
                 srcCurrency,
                 trgtCurrency,
-                new BigDecimal("0.92")
+                amount
             );
 
             // Act + Assert.
@@ -252,6 +313,9 @@ class ExchangeRateControllerTests {
 
             restTestClient
                 .post().uri("/api/v1/exchange-rates")
+                .headers(
+                    h -> h.setBearerAuth(accessToken)
+                )
                 .body(exchangeRateRequestCreate)
                 .exchange()
                 .expectStatus().isBadRequest()
@@ -270,6 +334,8 @@ class ExchangeRateControllerTests {
     @Test
     void create_7() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         String sameCurrency = "EUR";
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -291,6 +357,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(exchangeRateRequestCreate)
             .exchange()
             .expectStatus().isBadRequest()
@@ -308,12 +377,18 @@ class ExchangeRateControllerTests {
      */
     @Test
     void create_8() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
+        Integer year = 2008;
+        String srcCurrency = "EUR";
+        String tgtCurrency = "USD";
+
         for (String srcToTrgtFactor : new String[] {"0", "-1.085"}) {
-            // Arrange.
             ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-                2008,
-                "EUR",
-                "USD",
+                year,
+                srcCurrency,
+                tgtCurrency,
                 new BigDecimal(srcToTrgtFactor)
             );
 
@@ -329,6 +404,9 @@ class ExchangeRateControllerTests {
 
             restTestClient
                 .post().uri("/api/v1/exchange-rates")
+                .headers(
+                    h -> h.setBearerAuth(accessToken)
+                )
                 .body(exchangeRateRequestCreate)
                 .exchange()
                 .expectStatus().isBadRequest()
@@ -348,12 +426,18 @@ class ExchangeRateControllerTests {
      */
     @Test
     void create_9() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+        
+        Integer year = 2009;
+        String srcCurrency = "EUR";
+        String tgtCurrency = "USD";
+
         for (String srcToTrgtFactor : new String[] {"0.000000001", "12345678901"}) {
-            // Arrange.
             ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-                2009,
-                "EUR",
-                "USD",
+                year,
+                srcCurrency,
+                tgtCurrency,
                 new BigDecimal(srcToTrgtFactor)
             );
 
@@ -369,6 +453,9 @@ class ExchangeRateControllerTests {
 
             restTestClient
                 .post().uri("/api/v1/exchange-rates")
+                .headers(
+                    h -> h.setBearerAuth(accessToken)
+                )
                 .body(exchangeRateRequestCreate)
                 .exchange()
                 .expectStatus().isBadRequest()
@@ -385,9 +472,15 @@ class ExchangeRateControllerTests {
      */
     @Test
     void retrieveOne_1() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
         // Act + Assert.
         restTestClient
             .get().uri("/api/v1/exchange-rates/2001/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isNotFound()
             .expectBody().isEmpty();
@@ -399,6 +492,9 @@ class ExchangeRateControllerTests {
      */
     @Test
     void retrieveOne_2() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
         // Act + Assert.
         String expectedBodyJSON = """
             {
@@ -411,6 +507,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/abc/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isBadRequest()
             .expectBody().json(
@@ -427,13 +526,15 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveOne_3() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2003, 
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
-        createExchangeRate(exchangeRateRequestCreate);
+        createExchangeRate(accessToken, exchangeRateRequestCreate);
 
         // Act + Assert.
         String expectedBodyJSON = """
@@ -447,6 +548,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2003/eur/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isBadRequest()
             .expectBody().json(
@@ -461,9 +565,15 @@ class ExchangeRateControllerTests {
      */
     @Test
     void retrieveAll_1() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
         // Act + Assert.
         restTestClient
             .get().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -479,13 +589,15 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveAll_2() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
             2001,
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRate exchangeRate1 = createExchangeRate(exchangeRateRequestCreate1);
+        ExchangeRate exchangeRate1 = createExchangeRate(accessToken, exchangeRateRequestCreate1);
 
         ExchangeRateRequestCreate exchangeRateRequestCreate2 = new ExchangeRateRequestCreate(
             2002,
@@ -493,7 +605,7 @@ class ExchangeRateControllerTests {
             "EUR",
             new BigDecimal("1.06")
         );
-        ExchangeRate exchangeRate2 = createExchangeRate(exchangeRateRequestCreate2);
+        ExchangeRate exchangeRate2 = createExchangeRate(accessToken, exchangeRateRequestCreate2);
 
         // Act + Assert.
         String expectedBodyJSON = """
@@ -520,6 +632,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .get().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -535,13 +650,15 @@ class ExchangeRateControllerTests {
     @Test
     void update_1() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2001,
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRate exchangeRate = createExchangeRate(exchangeRateRequestCreate);
+        ExchangeRate exchangeRate = createExchangeRate(accessToken, exchangeRateRequestCreate);
 
         // Act + Assert.
         ExchangeRateRequestUpdate exchangeRateRequestUpdate = new ExchangeRateRequestUpdate(
@@ -560,6 +677,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .put().uri("/api/v1/exchange-rates/2001/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(exchangeRateRequestUpdate)
             .exchange()
             .expectStatus().isOk()
@@ -570,6 +690,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2001/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -585,6 +708,8 @@ class ExchangeRateControllerTests {
     @Test
     void update_2() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestUpdate exchangeRateRequestUpdate = new ExchangeRateRequestUpdate(
             new BigDecimal("1.1")
         );
@@ -592,6 +717,9 @@ class ExchangeRateControllerTests {
         // Act + Assert.
         restTestClient
             .put().uri("/api/v1/exchange-rates/2002/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(exchangeRateRequestUpdate)
             .exchange()
             .expectStatus().isNotFound()
@@ -599,6 +727,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2002/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isNotFound()
             .expectBody().isEmpty();
@@ -611,13 +742,15 @@ class ExchangeRateControllerTests {
     @Test
     void update_3() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2003,
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRate exchangeRate = createExchangeRate(exchangeRateRequestCreate);
+        ExchangeRate exchangeRate = createExchangeRate(accessToken, exchangeRateRequestCreate);
 
         ExchangeRateRequestUpdate updateRequest = new ExchangeRateRequestUpdate(
             new BigDecimal("0")
@@ -635,6 +768,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .put().uri("/api/v1/exchange-rates/2003/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(updateRequest)
             .exchange()
             .expectStatus().isBadRequest()
@@ -655,6 +791,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2003/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -670,13 +809,15 @@ class ExchangeRateControllerTests {
     @Test
     void update_4() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2004,
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRate exchangeRate = createExchangeRate(exchangeRateRequestCreate);
+        ExchangeRate exchangeRate = createExchangeRate(accessToken, exchangeRateRequestCreate);
 
         ExchangeRateRequestUpdate updateRequest = new ExchangeRateRequestUpdate(
             new BigDecimal("1.1")
@@ -694,6 +835,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .put().uri("/api/v1/exchange-rates/2004/EUR/usd")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .body(updateRequest)
             .exchange()
             .expectStatus().isBadRequest()
@@ -714,6 +858,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2004/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk()
             .expectBody().json(
@@ -728,9 +875,15 @@ class ExchangeRateControllerTests {
      */
     @Test
     void delete_1() {
+        // Arrange.
+        String accessToken = obtainAccessToken();
+
         // Act + Assert.
         restTestClient
             .delete().uri("/api/v1/exchange-rates/2001/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isNotFound()
             .expectBody().isEmpty();
@@ -743,23 +896,31 @@ class ExchangeRateControllerTests {
     @Test
     void delete_2() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2002,
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
-        createExchangeRate(exchangeRateRequestCreate);
+        createExchangeRate(accessToken, exchangeRateRequestCreate);
 
         // Act + Assert.
         restTestClient
             .delete().uri("/api/v1/exchange-rates/2002/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isNoContent()
             .expectBody().isEmpty();
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2002/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isNotFound()
             .expectBody().isEmpty();
@@ -772,13 +933,15 @@ class ExchangeRateControllerTests {
     @Test
     void delete_3() {
         // Arrange.
+        String accessToken = obtainAccessToken();
+
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2003,
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
-        createExchangeRate(exchangeRateRequestCreate);
+        createExchangeRate(accessToken, exchangeRateRequestCreate);
 
         // Act + Assert.
         String expectedBodyJSON = """
@@ -792,6 +955,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .delete().uri("/api/v1/exchange-rates/2003/eur/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isBadRequest()
             .expectBody().json(
@@ -801,6 +967,9 @@ class ExchangeRateControllerTests {
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2003/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
             .exchange()
             .expectStatus().isOk();
     }
