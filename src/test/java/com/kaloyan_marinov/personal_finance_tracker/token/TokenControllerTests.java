@@ -8,6 +8,10 @@ import java.util.Base64;
 
 import org.junit.jupiter.api.Assertions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
+import com.kaloyan_marinov.personal_finance_tracker.user.UserResponseCreate;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,8 +30,6 @@ import org.springframework.test.web.servlet.client.RestTestClient;
         "spring.datasource.url=jdbc:h2:mem:test",
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
-        "pft.security.user.name=application-user-for-test-suite-u",
-        "pft.security.user.password=application-user-for-test-suite-p",
         "pft.security.secret.key=secret-value-that-must-be-of-at-least-256-bits-aka-32-bytes"
     }
 )
@@ -38,6 +40,7 @@ because it creates a `MockMvc` bean that has the security filter chain,
 and then the `RestTestClient` binds to the created `MockMvc` bean.
 */
 @AutoConfigureMockMvc
+@Transactional
 class TokenControllerTests {
     
     @Autowired
@@ -86,11 +89,44 @@ class TokenControllerTests {
         );
     }
 
+    private UserResponseCreate createUser(
+        String username,
+        String email,
+        String password
+    ) {
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            username,
+            email,
+            password
+        );
+
+        UserResponseCreate userResponseCreate = restTestClient
+            .post().uri("/api/v1/users")
+            .body(userRequestCreate)
+            .exchange()
+            .expectStatus().isCreated()
+            .expectBody(UserResponseCreate.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
+        return userResponseCreate;
+    }
+
     @Test
     void create_3() {
         // Arrange.
-        String wrongUsername = "wrong-u";
-        String wrongPassword = "wrong-p";
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String wrongUsername = "wrong-" + email;
+        String wrongPassword = "wrong-" + password;
 
         // Act + Assert.
         restTestClient
@@ -109,14 +145,23 @@ class TokenControllerTests {
     @Test
     void create_4() {
         // Arrange.
-        String wrongPassword = "wrong-p";
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String wrongPassword = "wrong-" + password;
 
         // Act + Assert.
         restTestClient
             .post().uri("/api/v1/tokens")
             .headers(
                 h -> h.setBasicAuth(
-                    "application-user-for-test-suite-u",
+                    email,
                     wrongPassword
                 )
             )
@@ -127,13 +172,23 @@ class TokenControllerTests {
 
     @Test
     void create_5() {
+        // Arrange.
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/tokens")
             .headers(
                 h -> h.setBasicAuth(
-                    "application-user-for-test-suite-u",
-                    "application-user-for-test-suite-p"
+                    email,
+                    password
                 )
             )
             .exchange()
@@ -156,6 +211,15 @@ class TokenControllerTests {
     @Test
     void create_6() {
         // Arrange.
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
         Instant instantBefore = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
         // Act.
@@ -163,8 +227,8 @@ class TokenControllerTests {
             .post().uri("/api/v1/tokens")
             .headers(
                 h -> h.setBasicAuth(
-                    "application-user-for-test-suite-u",
-                    "application-user-for-test-suite-p"
+                    email,
+                    password
                 )
             )
             .exchange()
@@ -185,10 +249,14 @@ class TokenControllerTests {
             jwt.getHeaders().get("alg")
         );
         Assertions.assertEquals(
-            1L,
+            userResponseCreate.id(),
             (
                 (Number) jwt.getClaim("userId")
             ).longValue()
+        );
+        Assertions.assertEquals(
+            userResponseCreate.username(),
+            jwt.getSubject()
         );
 
         Instant instantOfExpiration = jwt.getExpiresAt();
@@ -211,13 +279,23 @@ class TokenControllerTests {
     */
     @Test
     void create_7() {
+        // Arrange.
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
         // Act.
         TokenResponse tokenResponse = restTestClient
             .post().uri("/api/v1/tokens")
             .headers(
                 h -> h.setBasicAuth(
-                    "application-user-for-test-suite-u",
-                    "application-user-for-test-suite-p"
+                    email,
+                    password
                 )
             )
             .exchange()
@@ -236,10 +314,16 @@ class TokenControllerTests {
         );
 
         Assertions.assertTrue(
-            payload.contains("application-user-for-test-suite-u")
+            payload.contains(username)
+        );
+        Assertions.assertTrue(
+            payload.contains(userResponseCreate.id().toString())
         );
         Assertions.assertFalse(
-            payload.contains("application-user-for-test-suite-p")
+            payload.contains(email)
+        );
+        Assertions.assertFalse(
+            payload.contains(password)
         );
     }
 

@@ -34,13 +34,21 @@ public record ExchangeRateRequestCreate(
     BigDecimal sourceToTargetFactor
 ) {
 
-    // This mirrors `chk_exchange_rates_distinct_currencies`,
-    // so that the client gets a 400 with a `fieldErrors` entry
-    // rather than a database error.
-    // (
-    // A missing currency is reported by `@NotNull` instead, so it is not reported here too.
-    // `@JsonIgnore` keeps this method from being serialized as a `distinctCurrencies` property.
-    // )
+    /**
+     * This mirrors `chk_exchange_rates_distinct_currencies`,
+     * so that the client gets a 400 with a `fieldErrors` entry
+     * rather than a database error.
+     * 
+     * (
+     * A few remarks are in order:
+     * 
+     * - A missing currency is reported by `@NotNull` instead,
+     *   so it is not reported here too.
+     * 
+     * - `@JsonIgnore` prevents this method
+     *   from being serialized as a `distinctCurrencies` property.
+     * )
+    */
     @JsonIgnore
     @AssertTrue(message = "sourceCurrency and targetCurrency must differ")
     public boolean isDistinctCurrencies() {

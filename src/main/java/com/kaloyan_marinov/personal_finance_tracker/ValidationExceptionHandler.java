@@ -6,6 +6,7 @@ import java.util.stream.Stream;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,6 +39,25 @@ public class ValidationExceptionHandler {
                 Map.of(
                     "error", "Validation failed",
                     "fieldErrors", fieldErrors
+                )
+            );
+    }
+
+    /** 
+     * This is thrown when the request body cannot be deserialized
+     * (such as malformed JSON or a value of the wrong type).
+     * The exception's message is deliberately not echoed,
+     * because doing so would expose internal details (such as class names).
+    */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleUnreadableBody(
+        HttpMessageNotReadableException e
+    ) {
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(
+                Map.of(
+                    "error", "Malformed request body"
                 )
             );
     }

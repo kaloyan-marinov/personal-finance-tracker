@@ -23,7 +23,7 @@ import jakarta.persistence.Table;
 )
 public class Transaction {
     @Id
-    @GeneratedValue (strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // According to https://www.h2database.com/html/advanced.html ,

@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -17,8 +18,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -26,10 +27,12 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.kaloyan_marinov.personal_finance_tracker.user.UserRepository;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+
+import jakarta.servlet.DispatcherType;
 
 @Configuration
 @EnableWebSecurity
@@ -39,7 +42,11 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain securityFilterChainForBasicAuth(HttpSecurity http) throws Exception {
         http
-            .securityMatcher("/api/v1/tokens")
+            .securityMatchers(
+                (matchers) -> matchers
+                    .requestMatchers("/api/v1/tokens")
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/users/{id}")
+            )
             .authorizeHttpRequests((authorize) -> authorize
                 .anyRequest().authenticated()
             )
@@ -59,6 +66,46 @@ public class SecurityConfig {
             // this «security filter chain» catches every request not matched by the other «security filter chain»,
             // so any endpoint (including ones added later) requires a Bearer token by default.
             .authorizeHttpRequests((authorize) -> authorize
+                /*
+                When a controller - or «Spring MVC» itself (e.g. on a malformed request body) - calls `response.sendError(...)`,
+                the servlet container forwards to `/error` (an «ERROR dispatch»),
+                which passes through this «security filter chain» again;
+                without a rule for it, a request without a token gets a 401 instead of the real status.
+
+                (
+                    For example,
+
+                    a `POST /api/v1/users` with a malformed JSON body (and no token, as permitted below)
+                    fails with an `HttpMessageNotReadableException`
+                    before the controller method is even invoked;
+
+                    «Spring MVC»'s `DefaultHandlerExceptionResolver` turns that into `response.sendError(400)`,
+                    but the ensuing ERROR dispatch carries no token,
+                    so - without a rule for it - the client would get a 401 instead of the 400.
+                )
+
+                There are 2 ways of permitting it:
+
+                1. `.requestMatchers("/error")` matches the path,
+                   so it also lets clients call `GET /error` directly without a token,
+                   and it stops matching if `server.error.path` is changed.
+
+                2. `.dispatcherTypeMatchers(DispatcherType.ERROR)` matches only the container's own error dispatches,
+                   so a direct `GET /error` still requires a Bearer token,
+                   and it keeps matching wherever the error page lives.
+
+                The latter is preferable: it permits exactly what is needed (and nothing more),
+                which keeps the "requires a Bearer token by default" promise above;
+                it is also the approach shown in the «Spring Security» reference documentation.
+
+                [Caveat]
+
+                `MockMvc` does not perform the ERROR dispatch,
+                so tests based on it cannot tell the 2 options apart (nor catch the 401 in the 1st place);
+                only a running server can (e.g. `@SpringBootTest(webEnvironment = RANDOM_PORT)`).
+                */
+                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
                 .anyRequest().authenticated()
             )
             .csrf((csrf) -> csrf.disable())
@@ -87,36 +134,22 @@ public class SecurityConfig {
         return new ProviderManager(daoAuthenticationProvider);
     }
 
-    /**
-     * - `${pft.security.user.name}` has no default value (there is no `:...` after it).
-     * 
-     *    So if the variable is missing, <u>the app fails at startup</u>.
-     * 
-     * - The property names are your own, so the `pft.` prefix is just a convention.
-     * 
-     * Spring Boot's «relaxed binding» maps the environment variable
-     * `PFT_SECURITY_USER_NAME` to the property `pft.security.user.name`
-     * (uppercase it, and replace `.` with `_`).
-     */
     @Bean
     public UserDetailsService userDetailsService(
-        PasswordEncoder pe,
-        @Value("${pft.security.user.name}") String username,
-        @Value("${pft.security.user.password}") String password
+        UserRepository userRepository
     ) {
-        if (password.isBlank()) {
-            throw new IllegalStateException("PFT_SECURITY_USER_PASSWORD may not be set to an empty string & may not be made only of spaces");
-        }
-
-        UserDetails userDetails = User
-            .withUsername(username)
-            .password(
-                pe.encode(password)
+        return email -> userRepository
+            .findByEmail(email)
+            .map(
+                (user) -> User
+                    .withUsername(user.getEmail())
+                    .password(user.getPasswordHash())
+                    .build()
             )
-            .roles("USER")
-            .build();
-
-        return new InMemoryUserDetailsManager(userDetails);
+            // `DaoAuthenticationProvider` expects exactly this exception for an unknown user
+            // (any other exception is treated as an internal error).
+            .orElseThrow(() -> new UsernameNotFoundException(email))
+        ;
     }
 
     @Bean
@@ -124,6 +157,17 @@ public class SecurityConfig {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
+    /**
+     * - `${pft.security.secret.key}` has no default value (there is no `:...` after it).
+     * 
+     *    So if the variable is missing, <u>the app fails at startup</u>.
+     * 
+     * - The property names are your own, so the `pft.` prefix is just a convention.
+     * 
+     * Spring Boot's «relaxed binding» maps the environment variable
+     * `PFT_SECURITY_SECRET_KEY` to the property `pft.security.secret.key`
+     * (uppercase it, and replace `.` with `_`).
+     */
     @Bean
     SecretKey secretKey(
         @Value("${pft.security.secret.key}") String secret

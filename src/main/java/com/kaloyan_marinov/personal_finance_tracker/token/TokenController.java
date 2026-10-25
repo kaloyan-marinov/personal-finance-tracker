@@ -15,13 +15,19 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kaloyan_marinov.personal_finance_tracker.user.User;
+import com.kaloyan_marinov.personal_finance_tracker.user.UserRepository;
+
 @RestController
 @RequestMapping("/api/v1/tokens")
 public class TokenController {
 
+    private final UserRepository userRepository;
+
     private final JwtEncoder jwtEncoder;
 
-    public TokenController(JwtEncoder jwtEncoder) {
+    public TokenController(UserRepository userRepository, JwtEncoder jwtEncoder) {
+        this.userRepository = userRepository;
         this.jwtEncoder = jwtEncoder;
     }
 
@@ -33,6 +39,13 @@ public class TokenController {
         long secondsOfValidity = Duration.ofHours(1).toSeconds();
         Instant instantOfExpiration = instantNow.plusSeconds(secondsOfValidity);
 
+        String email = authentication.getName();
+
+        User user = userRepository
+            .findByEmail(email)
+            .orElseThrow(() -> new IllegalArgumentException(email))
+        ;
+
         // Without making this explicit,
         // the `jwtEncoder` bean would use the default header for `NimbusJwtEncoder`,
         // which asks for the RS256 (RSA) algorithm.
@@ -43,13 +56,11 @@ public class TokenController {
         JwtClaimsSet jwtClaimsSet = JwtClaimsSet
             .builder()
             .expiresAt(instantOfExpiration)
-            // Spring Security's resource server reads the principal name from `sub` by default;
+            // «Spring Security»'s resource server reads the principal name from `sub` by default;
             // consequently, if the following claim were omitted,
             // the `Authentication` of Bearer-authenticated requests would have a `null` name.
-            .subject(authentication.getName())
-            // At present, there is a single application user,
-            // so its ID is hardcoded.
-            .claim("userId", 1)
+            .subject(user.getUsername())
+            .claim("userId", user.getId())
             .build()
         ;
         JwtEncoderParameters jwtEncoderParameters = JwtEncoderParameters.from(

@@ -30,10 +30,14 @@ To run a single test case (with more logging output):
 $ ./mvnw \
     -q \
     test \
-    -Dtest=TransactionControllerTests#create_1 \
+    -Dtest=UserControllerTests#create_1 \
     -Dlogging.level.org.springframework.security=DEBUG \
     -Dlogging.level.org.springframework.web=TRACE \
-    -Dlogging.level.org.springframework.test=DEBUG
+    -Dlogging.level.org.springframework.test=DEBUG ; \
+    echo "exit code: $?"
+
+# ...
+exit code: 0
 ```
 
 ```shell
@@ -56,11 +60,15 @@ $ ./mvnw \
 # )
 $ ./mvnw \
     -q \
-    -Dtest=TransactionControllerTests#create_1 \
+    -Dtest=UserControllerTests#create_1 \
     -Dlogging.level.org.springframework.security=DEBUG \
     -Dlogging.level.org.springframework.web=TRACE \
     -Dlogging.level.org.springframework.test=DEBUG \
-    test
+    test ; \
+    echo "exit code: $?"
+
+# ...
+exit code: 0
 ```
 
 
@@ -121,11 +129,11 @@ $ (
 )
 
 UPDATE SUMMARY
-Run:                          6
+Run:                          9
 Previously run:               0
 Filtered out:                 0
 -------------------------------
-Total change sets:            6
+Total change sets:            9
 ```
 
 ```sql
@@ -137,21 +145,25 @@ mysql> SHOW TABLES;
 | DATABASECHANGELOGLOCK |
 | exchange_rates        |
 | transactions          |
+| users                 |
 +-----------------------+
-4 rows in set (0.00 sec)
+5 rows in set (0.00 sec)
 
 mysql> select ID, FILENAME, DATEEXECUTED from DATABASECHANGELOG;
 +-----------------+--------------------------------------------+---------------------+
 | ID              | FILENAME                                   | DATEEXECUTED        |
 +-----------------+--------------------------------------------+---------------------+
-| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:48 |
-| 1791063470290-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:48 |
-| 1791224952245-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:48 |
-| 1791224952245-2 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:48 |
-| 1791224952245-3 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:49 |
-| 1791224952245-4 | db/changelog/db.changelog-master.mysql.sql | 2026-10-07 20:22:49 |
+| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
+| 1791063470290-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
+| 1791224952245-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
+| 1791224952245-2 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
+| 1791224952245-3 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
+| 1791224952245-4 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
+| 1792698341395-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
+| 1792698341395-2 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
+| 1792698341395-3 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
 +-----------------+--------------------------------------------+---------------------+
-6 rows in set (0.00 sec)
+9 rows in set (0.00 sec)
 ```
 
 
@@ -195,8 +207,9 @@ mysql> SHOW TABLES;
 | DATABASECHANGELOGLOCK |
 | exchange_rates        |
 | transactions          |
+| users                 |
 +-----------------------+
-4 rows in set (0.00 sec)
+5 rows in set (0.00 sec)
 
 mysql> select ID, FILENAME, DATEEXECUTED from DATABASECHANGELOG;
 -- The output should be identical to
@@ -237,56 +250,28 @@ Use another terminal window to issue these HTTP requests:
 
 # Create an empty database from scratch.
 
+$ chmod u+x scripts/0_issue_requests_for_CRUD_operations_with_users.sh
+$ scripts/0_issue_requests_for_CRUD_operations_with_users.sh
+
 $ chmod u+x scripts/5_issue_requests_for_tokens.sh
-$ (
-    set -a ;
-
-    source .env ;
-
-    scripts/5_issue_requests_for_tokens.sh ;
-)
+$ scripts/5_issue_requests_for_tokens.sh
 
 $ chmod u+x scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
-$ (
-    set -a ;
-
-    source .env ;
-
-    scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh ;
-)
+$ scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
 
 # Create an empty database from scratch.
 
 $ chmod u+x scripts/2_issue_requests_for_computing_totals.sh
-$ (
-    set -a ;
-
-    source .env ;
-
-    scripts/2_issue_requests_for_computing_totals.sh ;
-)
+$ scripts/2_issue_requests_for_computing_totals.sh
 
 # Create an empty database from scratch.
 
 $ chmod u+x scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
-$ (
-    set -a ;
-
-    source .env ;
-
-    scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh ;
-)
+$ scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
 
 # Create an empty database from scratch.
 
-$ chmod u+x scripts/4_issue_requests_for_computing_totals_and_converting.sh
-$ (
-    set -a ;
-
-    source .env ;
-
-    scripts/4_issue_requests_for_computing_totals_and_converting.sh ;
-)
+$ scripts/4_issue_requests_for_computing_totals_and_converting.sh
 ```
 
 

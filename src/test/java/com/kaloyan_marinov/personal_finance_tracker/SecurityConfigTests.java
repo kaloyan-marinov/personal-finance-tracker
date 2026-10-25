@@ -17,9 +17,7 @@ class SecurityConfigTests {
         "spring.datasource.url=jdbc:h2:mem:test-security-config",
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
-        "server.port=0",
-        "pft.security.user.name=application-user-for-test-suite-u",
-        "pft.security.user.password=application-user-for-test-suite-p"
+        "server.port=0"
     );
 
     /*

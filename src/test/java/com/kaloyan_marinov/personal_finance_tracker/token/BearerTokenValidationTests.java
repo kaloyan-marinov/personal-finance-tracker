@@ -27,17 +27,17 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 differ from the following imports.
 
 The two are layers of the same stack:
-Spring Security's types are a library-agnostic abstraction,
+«Spring Security»'s types are a library-agnostic abstraction,
 and `NimbusJwtEncoder` translates them into Nimbus' types
 (which is why Nimbus is always on the classpath via `spring-security-oauth2-jose`).
 
 - `TokenController` issues tokens through the application's `JwtEncoder` bean,
-  so it must speak Spring's API (= must use Spring Security's types).
+  so it must speak Spring's API (= must use «Spring Security»'s types).
 
 - This file's class builds (deliberately bad) tokens that the application should never issue,
   and uses Nimbus directly for the following reasons:
 
-  1. An unsigned JWT (`"alg": "none"`) cannot be produced via Spring Security's `JwtEncoder`,
+  1. An unsigned JWT (`"alg": "none"`) cannot be produced via «Spring Security»'s `JwtEncoder`,
      which only produces signed JWTs;
      Nimbus' `PlainJWT` makes that straightforward.
 
@@ -72,8 +72,6 @@ import com.nimbusds.jwt.SignedJWT;
         "spring.datasource.url=jdbc:h2:mem:test",
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
-        "pft.security.user.name=application-user-for-test-suite-u",
-        "pft.security.user.password=application-user-for-test-suite-p",
         "pft.security.secret.key=" + BearerTokenValidationTests.SECRET
     }
 )
@@ -243,7 +241,7 @@ class BearerTokenValidationTests {
     /**
      * An expired JWT should be rejected.
      *
-     * Spring Security tolerates a clock skew of 60 seconds by default,
+     * «Spring Security» tolerates a clock skew of 60 seconds by default,
      * so the expiration lies well beyond that.
      */
     @Test

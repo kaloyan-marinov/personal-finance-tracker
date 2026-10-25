@@ -1,7 +1,9 @@
+#!/usr/bin/env bash
+
 # A FEW WORDS OF CAUTION
 #
 # Each request below is stored as a string in `cmd` and executed via `eval "$cmd"`,
-# so that quoted arguments containing spaces stay intact.
+# so that quoted arguments containing spaces (e.g. 'description=train ticket') stay intact.
 # That is safe here,
 # because every `cmd` is built from literals within this script.
 #
@@ -9,15 +11,40 @@
 # when the string it runs contains data you don't control (script arguments, env vars, HTTP responses);
 # here, every cmd="..." is a fixed string written into the script.
 
-# An exchange rate is addressed by its natural key, `<year> <sourceCurrency> <targetCurrency>`,
-# which plays the role that `<id>` plays for transactions.
+ONE_SECOND=1
+FIVE_SECONDS=5
+
+USER_1_USERNAME=jd
+USER_1_EMAIL=john.doe@protonmail.com
+USER_1_PASSWORD=123
+
+
+
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
+
+cmd="
+http \\
+    POST \\
+    localhost:8080/api/v1/users \\
+    username=${USER_1_USERNAME} \\
+    email=${USER_1_EMAIL} \\
+    password=${USER_1_PASSWORD}
+"
+echo "$cmd"
+eval "$cmd"
+
+
+
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 TKN=$(
     set -a ;
     source .env ;
     http \
         --print=b \
-        --auth "${PFT_SECURITY_USER_NAME}:${PFT_SECURITY_USER_PASSWORD}" \
+        --auth "${USER_1_EMAIL}:${USER_1_PASSWORD}" \
         POST localhost:8080/api/v1/tokens \
         | jq \
             --raw-output \
@@ -77,7 +104,9 @@ delete_exchange_rate() {
 }
 
 
-N_SECONDS=1
+
+echo "sleeping for $FIVE_SECONDS second(s)"
+sleep $FIVE_SECONDS
 
 
 
@@ -85,8 +114,8 @@ N_SECONDS=1
 # (If you execute this script immediately after a fresh restart of the web application
 # against an empty database,
 # the HTTP response should consist of zero exchange rates.)
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="retrieve_exchange_rates"
 echo "$cmd"
@@ -96,8 +125,8 @@ eval "$cmd"
 
 # Attempt to create exchange rates that fail validation.
 # (None of the following requests should actually create a new exchange rate.)
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2000 sourceCurrency=EUR targetCurrency=USD"
 echo "$cmd"
@@ -105,8 +134,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2000 sourceCurrency=EUR targetCurrency=USD sourceToTargetFactor:=-1.08"
 echo "$cmd"
@@ -114,8 +143,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2000 sourceCurrency=EUR targetCurrency=USD sourceToTargetFactor:=1.123456789"
 echo "$cmd"
@@ -123,8 +152,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2000 sourceCurrency=eur targetCurrency=USD sourceToTargetFactor:=1.08"
 echo "$cmd"
@@ -132,8 +161,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2000 sourceCurrency=EUR targetCurrency=EUR sourceToTargetFactor:=1"
 echo "$cmd"
@@ -142,8 +171,8 @@ eval "$cmd"
 
 
 # Create several exchange rates.
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2010 sourceCurrency=EUR targetCurrency=USD sourceToTargetFactor:=1.10"
 echo "$cmd"
@@ -151,8 +180,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2020 sourceCurrency=EUR targetCurrency=USD sourceToTargetFactor:=1.20"
 echo "$cmd"
@@ -160,8 +189,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2030 sourceCurrency=EUR targetCurrency=USD sourceToTargetFactor:=1.30"
 echo "$cmd"
@@ -171,8 +200,8 @@ eval "$cmd"
 
 # Attempt to create an exchange rate whose key is identical to that of the most recently created one.
 # (Unlike for transactions, this should fail with a 409 Conflict.)
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2030 sourceCurrency=EUR targetCurrency=USD sourceToTargetFactor:=1.33"
 echo "$cmd"
@@ -182,8 +211,8 @@ eval "$cmd"
 
 # Create an exchange rate in the opposite direction of an existing one.
 # (That is a different key, so this should succeed.)
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="create_exchange_rate year:=2030 sourceCurrency=USD targetCurrency=EUR sourceToTargetFactor:=0.76923077"
 echo "$cmd"
@@ -191,8 +220,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="retrieve_exchange_rates"
 echo "$cmd"
@@ -203,8 +232,8 @@ eval "$cmd"
 # Retrieve a single exchange rate.
 nonexistent_key="2017 EUR USD"
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="retrieve_one_exchange_rate $nonexistent_key"
 echo "$cmd"
@@ -214,8 +243,8 @@ eval "$cmd"
 
 existent_key="2030 EUR USD"
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="retrieve_one_exchange_rate $existent_key"
 echo "$cmd"
@@ -224,8 +253,8 @@ eval "$cmd"
 
 
 # Update an exchange rate.
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="update_exchange_rate $nonexistent_key sourceToTargetFactor:=1.17"
 echo "$cmd"
@@ -233,8 +262,8 @@ eval "$cmd"
 
 
 # The following request should leave the (targeted) exchange rate unchanged.
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="update_exchange_rate $existent_key sourceToTargetFactor:=null"
 echo "$cmd"
@@ -242,8 +271,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="update_exchange_rate $existent_key sourceToTargetFactor:=1.36"
 echo "$cmd"
@@ -251,8 +280,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="retrieve_exchange_rates"
 echo "$cmd"
@@ -261,8 +290,8 @@ eval "$cmd"
 
 
 # Delete an exchange rate.
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="delete_exchange_rate $nonexistent_key"
 echo "$cmd"
@@ -270,8 +299,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="delete_exchange_rate $existent_key"
 echo "$cmd"
@@ -279,8 +308,8 @@ eval "$cmd"
 
 
 
-echo "sleeping for $N_SECONDS second(s)"
-sleep $N_SECONDS
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
 
 cmd="retrieve_exchange_rates"
 echo "$cmd"

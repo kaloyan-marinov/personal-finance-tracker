@@ -10,13 +10,13 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
+
 @SpringBootTest(
     properties = {
         "spring.datasource.url=jdbc:h2:mem:test",
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.mysql.sql",
-        "pft.security.user.name=application-user-for-test-suite-u",
-        "pft.security.user.password=application-user-for-test-suite-p",
         "pft.security.secret.key=secret-value-that-must-be-of-at-least-256-bits-aka-32-bytes"
     }
 )
@@ -73,13 +73,26 @@ class FaultyUseOfAuthenticationSchemesTests {
      */
     @Test
     void retrieveAll_2() {
+        // Arrange.
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "jd",
+            "john.doe@protonmail.com",
+            "123"
+        );
+        restTestClient
+            .post().uri("/api/v1/users")
+            .body(userRequestCreate)
+            .exchange()
+            .expectStatus().isCreated()
+        ;
+
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBasicAuth(
-                    "application-user-for-test-suite-u",
-                    "application-user-for-test-suite-p"
+                    userRequestCreate.email(),
+                    userRequestCreate.password()
                 )
             )
             .exchange()

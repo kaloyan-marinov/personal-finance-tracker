@@ -49,3 +49,13 @@ ALTER TABLE exchange_rates ADD CONSTRAINT chk_exchange_rates_factor_positive CHE
 
 -- changeset kaloyan:1791224952245-4 splitStatements:false
 ALTER TABLE exchange_rates ADD CONSTRAINT chk_exchange_rates_distinct_currencies CHECK (source_currency != target_currency);
+
+-- changeset kaloyan:1792698341395-1 splitStatements:false
+CREATE TABLE users (id BIGINT AUTO_INCREMENT NOT NULL, email VARCHAR(128) NOT NULL, password_hash VARCHAR(128) NOT NULL, username VARCHAR(32) NOT NULL, CONSTRAINT usersPK PRIMARY KEY (id));
+
+-- changeset kaloyan:1792698341395-2 splitStatements:false
+ALTER TABLE users ADD CONSTRAINT uq_users_email UNIQUE (email);
+
+-- changeset kaloyan:1792698341395-3 splitStatements:false
+ALTER TABLE users ADD CONSTRAINT uq_users_username UNIQUE (username);
+

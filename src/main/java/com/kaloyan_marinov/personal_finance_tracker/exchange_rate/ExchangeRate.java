@@ -38,7 +38,7 @@ import jakarta.validation.constraints.Pattern;
 )
 public class ExchangeRate {
     @Id
-    @GeneratedValue (strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // According to https://www.h2database.com/html/advanced.html ,
