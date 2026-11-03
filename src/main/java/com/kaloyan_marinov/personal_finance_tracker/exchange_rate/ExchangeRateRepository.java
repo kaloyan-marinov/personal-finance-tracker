@@ -8,13 +8,19 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Long> {
 
-    boolean existsByYearAndSourceCurrencyAndTargetCurrency(
+    boolean existsByUserId(Long userId);
+
+    List<ExchangeRate> findAllByUserId(Long userId);
+
+    boolean existsByUserIdAndYearAndSourceCurrencyAndTargetCurrency(
+        Long userId,
         Integer year,
         String sourceCurrency,
         String targetCurrency
     );
 
-    Optional<ExchangeRate> findByYearAndSourceCurrencyAndTargetCurrency(
+    Optional<ExchangeRate> findByUserIdAndYearAndSourceCurrencyAndTargetCurrency(
+        Long userId,
         Integer year,
         String sourceCurrency,
         String targetCurrency
@@ -22,7 +28,8 @@ public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Long
 
     // This loads all the requested rates with a single query (`... IN (...)`),
     // rather than with 1 query per source currency.
-    List<ExchangeRate> findByYearAndTargetCurrencyAndSourceCurrencyIn(
+    List<ExchangeRate> findByUserIdAndYearAndTargetCurrencyAndSourceCurrencyIn(
+        Long userId,
         Integer year,
         String targetCurrency,
         Collection<String> sourceCurrencies

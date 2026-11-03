@@ -7,12 +7,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
+import com.kaloyan_marinov.personal_finance_tracker.user.UserResponseCreate;
 
 @SpringBootTest(
     properties = {
@@ -35,25 +37,39 @@ class ExchangeRateControllerTests {
     @Autowired
     private RestTestClient restTestClient;
 
-    private String obtainAccessToken() {
+    private UserResponseCreate createUser(
+        String username,
+        String email,
+        String password
+    ) {
         UserRequestCreate userRequestCreate = new UserRequestCreate(
-            "jd",
-            "john.doe@protonmail.com",
-            "123"
+            username,
+            email,
+            password
         );
-        restTestClient
+        UserResponseCreate userResponseCreate = restTestClient
             .post().uri("/api/v1/users")
             .body(userRequestCreate)
             .exchange()
             .expectStatus().isCreated()
+            .expectBody(UserResponseCreate.class)
+            .returnResult()
+            .getResponseBody()
         ;
 
+        return userResponseCreate;
+    }
+
+    private String obtainAccessToken(
+        String email,
+        String password
+    ) {
         TokenResponse tokenResponse = restTestClient
             .post().uri("/api/v1/tokens")
             .headers(
                 h -> h.setBasicAuth(
-                    userRequestCreate.email(),
-                    userRequestCreate.password()
+                    email,
+                    password
                 )
             )
             .exchange()
@@ -66,7 +82,7 @@ class ExchangeRateControllerTests {
         return tokenResponse.accessToken();
     }
 
-    private ExchangeRate createExchangeRate(
+    private ExchangeRateResponse createExchangeRate(
         String accessToken,
         ExchangeRateRequestCreate exchangeRateRequestCreate
     ) {
@@ -78,7 +94,7 @@ class ExchangeRateControllerTests {
             .body(exchangeRateRequestCreate)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(ExchangeRate.class)
+            .expectBody(ExchangeRateResponse.class)
             .returnResult()
             .getResponseBody();
     }
@@ -88,9 +104,22 @@ class ExchangeRateControllerTests {
      * and reads it back by its natural key.
      */
     @Test
-    void create_1() {
+    void create_01() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2001,
@@ -100,7 +129,10 @@ class ExchangeRateControllerTests {
         );
 
         // Act.
-        ExchangeRate exchangeRate = createExchangeRate(accessToken, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = createExchangeRate(
+            accessToken,
+            exchangeRateRequestCreate
+        );
 
         // Assert.
         String expectedBodyJSON = """
@@ -111,7 +143,7 @@ class ExchangeRateControllerTests {
                 targetCurrency: "EUR",
                 sourceToTargetFactor: 0.00571234
             }
-        """.formatted(exchangeRate.getId());
+        """.formatted(exchangeRateResponse.id());
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2001/JPY/EUR")
@@ -128,12 +160,25 @@ class ExchangeRateControllerTests {
 
     /**
      * POSTs a rate and then a second rate with the same natural key but a different factor.
-     * Expects a 409 response for the second one, which mirrors {@code uq_exchange_rates_year_currencies}.
+     * Expects a 409 response for the second one, which mirrors {@code uq_exchange_rates_user_id_year_currencies}.
      */
     @Test
-    void create_2() {
+    void create_02() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         Integer year = 2002;
         String sourceCurrency = "EUR";
@@ -181,9 +226,22 @@ class ExchangeRateControllerTests {
      * Expects both to be created, because the reverse direction is a separate row.
      */
     @Test
-    void create_3() {
+    void create_03() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
             2003,
@@ -208,9 +266,22 @@ class ExchangeRateControllerTests {
      * Expects a 400 response, which reports the missing field.
      */
     @Test
-    void create_4() {
+    void create_04() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             null,
@@ -249,9 +320,22 @@ class ExchangeRateControllerTests {
      * Expects a 400 response, which reports the violated pattern.
      */
     @Test
-    void create_5() {
+    void create_05() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         Integer year = 2005;
         String trgtCurrency = "USD";
@@ -296,9 +380,22 @@ class ExchangeRateControllerTests {
      * Expects a 400 response, which reports the violated pattern.
      */
     @Test
-    void create_6() {
+    void create_06() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         Integer year = 2006;
         String srcCurrency = "USD";
@@ -344,9 +441,22 @@ class ExchangeRateControllerTests {
      * Expects a 400 response, which mirrors {@code chk_exchange_rates_distinct_currencies}.
      */
     @Test
-    void create_7() {
+    void create_07() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         String sameCurrency = "EUR";
 
@@ -388,9 +498,22 @@ class ExchangeRateControllerTests {
      * Expects a 400 response, which mirrors {@code chk_exchange_rates_factor_positive}.
      */
     @Test
-    void create_8() {
+    void create_08() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         Integer year = 2008;
         String srcCurrency = "EUR";
@@ -437,9 +560,22 @@ class ExchangeRateControllerTests {
      * and one with 11 integer digits.
      */
     @Test
-    void create_9() {
+    void create_09() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
         
         Integer year = 2009;
         String srcCurrency = "EUR";
@@ -479,13 +615,96 @@ class ExchangeRateControllerTests {
     }
 
     /**
+     * Creates a user, obtains an access token for that user, and then deletes the user.
+     * POSTs an exchange rate with the (still unexpired) token.
+     * Expects a 401 response.
+     */
+    @Test
+    void create_10() {
+        // Arrange.
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
+
+        restTestClient
+            .delete().uri("/api/v1/users/" + userResponseCreate.id())
+            .headers(
+                h -> h.setBasicAuth(
+                    email,
+                    password
+                )
+            )
+            .exchange()
+            .expectStatus().isEqualTo(HttpStatus.NO_CONTENT)
+            .expectBody().isEmpty()
+        ;
+
+        ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
+            2001,
+            "JPY",
+            "EUR",
+            new BigDecimal("0.00571234")
+        );
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(exchangeRateRequestCreate)
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
+            {
+                "error": "unauthorized to create an exchange rate"
+            }
+            """
+        ;
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
+            .expectBody().json(
+                expectedBodyJSON,
+                JsonCompareMode.STRICT
+            )
+        ;
+    }
+
+    /**
      * GETs a rate which does not exist.
      * Expects a 404 response with an empty body.
      */
     @Test
     void retrieveOne_1() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         // Act + Assert.
         restTestClient
@@ -505,7 +724,20 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveOne_2() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         // Act + Assert.
         String expectedBodyJSON = """
@@ -538,10 +770,23 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveOne_3() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-            2003, 
+            2003,
             "EUR",
             "USD",
             new BigDecimal("1.085")
@@ -578,7 +823,20 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveAll_1() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         // Act + Assert.
         restTestClient
@@ -601,7 +859,20 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveAll_2() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
             2001,
@@ -609,7 +880,10 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRate exchangeRate1 = createExchangeRate(accessToken, exchangeRateRequestCreate1);
+        ExchangeRateResponse exchangeRateResponse1 = createExchangeRate(
+            accessToken,
+            exchangeRateRequestCreate1
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate2 = new ExchangeRateRequestCreate(
             2002,
@@ -617,7 +891,10 @@ class ExchangeRateControllerTests {
             "EUR",
             new BigDecimal("1.06")
         );
-        ExchangeRate exchangeRate2 = createExchangeRate(accessToken, exchangeRateRequestCreate2);
+        ExchangeRateResponse exchangeRateResponse2 = createExchangeRate(
+            accessToken,
+            exchangeRateRequestCreate2
+        );
 
         // Act + Assert.
         String expectedBodyJSON = """
@@ -638,8 +915,8 @@ class ExchangeRateControllerTests {
                 }
             ]
         """.formatted(
-            exchangeRate1.getId(),
-            exchangeRate2.getId()
+            exchangeRateResponse1.id(),
+            exchangeRateResponse2.id()
         );
 
         restTestClient
@@ -662,7 +939,20 @@ class ExchangeRateControllerTests {
     @Test
     void update_1() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2001,
@@ -670,7 +960,10 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRate exchangeRate = createExchangeRate(accessToken, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = createExchangeRate(
+            accessToken,
+            exchangeRateRequestCreate
+        );
 
         // Act + Assert.
         ExchangeRateRequestUpdate exchangeRateRequestUpdate = new ExchangeRateRequestUpdate(
@@ -685,7 +978,7 @@ class ExchangeRateControllerTests {
                 targetCurrency: "USD",
                 sourceToTargetFactor: 1.1
             }
-        """.formatted(exchangeRate.getId());
+        """.formatted(exchangeRateResponse.id());
 
         restTestClient
             .put().uri("/api/v1/exchange-rates/2001/EUR/USD")
@@ -720,7 +1013,20 @@ class ExchangeRateControllerTests {
     @Test
     void update_2() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestUpdate exchangeRateRequestUpdate = new ExchangeRateRequestUpdate(
             new BigDecimal("1.1")
@@ -754,7 +1060,20 @@ class ExchangeRateControllerTests {
     @Test
     void update_3() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2003,
@@ -762,7 +1081,10 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRate exchangeRate = createExchangeRate(accessToken, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = createExchangeRate(
+            accessToken,
+            exchangeRateRequestCreate
+        );
 
         ExchangeRateRequestUpdate updateRequest = new ExchangeRateRequestUpdate(
             new BigDecimal("0")
@@ -799,7 +1121,7 @@ class ExchangeRateControllerTests {
                 targetCurrency: "USD",
                 sourceToTargetFactor: 1.085
             }
-        """.formatted(exchangeRate.getId());
+        """.formatted(exchangeRateResponse.id());
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2003/EUR/USD")
@@ -821,7 +1143,20 @@ class ExchangeRateControllerTests {
     @Test
     void update_4() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2004,
@@ -829,7 +1164,10 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRate exchangeRate = createExchangeRate(accessToken, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = createExchangeRate(
+            accessToken,
+            exchangeRateRequestCreate
+        );
 
         ExchangeRateRequestUpdate updateRequest = new ExchangeRateRequestUpdate(
             new BigDecimal("1.1")
@@ -866,7 +1204,7 @@ class ExchangeRateControllerTests {
                 targetCurrency: "USD",
                 sourceToTargetFactor: 1.085
             }
-        """.formatted(exchangeRate.getId());
+        """.formatted(exchangeRateResponse.id());
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2004/EUR/USD")
@@ -888,7 +1226,20 @@ class ExchangeRateControllerTests {
     @Test
     void delete_1() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         // Act + Assert.
         restTestClient
@@ -908,7 +1259,20 @@ class ExchangeRateControllerTests {
     @Test
     void delete_2() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2002,
@@ -945,7 +1309,20 @@ class ExchangeRateControllerTests {
     @Test
     void delete_3() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2003,
@@ -984,5 +1361,64 @@ class ExchangeRateControllerTests {
             )
             .exchange()
             .expectStatus().isOk();
+    }
+
+    /**
+     * If a user owns any `ExchangeRate`s,
+     * an attempt to delete that user should be refused with a 409.
+     */
+    @Test
+    void delete_user() {
+        // Arrange.
+        String username = "jd";
+        String email = "john.doe@protonmail.com";
+        String password = "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
+
+        ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
+            2003,
+            "EUR",
+            "USD",
+            new BigDecimal("1.085")
+        );
+        ExchangeRateResponse exchangeRateResponse = createExchangeRate(accessToken, exchangeRateRequestCreate);
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .delete().uri("/api/v1/users/" + userResponseCreate.id())
+            .headers(
+                h -> h.setBasicAuth(
+                    email,
+                    password
+                )
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON = 
+            """
+            {
+                "error": "unable to delete your user, because you still have exchange rates"
+            }
+            """
+        ;
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.CONFLICT)
+            .expectBody().json(
+                expectedBodyJSON,
+                JsonCompareMode.STRICT
+            )
+        ;
     }
 }

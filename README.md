@@ -30,14 +30,14 @@ To run a single test case (with more logging output):
 $ ./mvnw \
     -q \
     test \
-    -Dtest=UserControllerTests#create_1 \
+    -Dtest=TransactionControllerTests#create_1 \
     -Dlogging.level.org.springframework.security=DEBUG \
     -Dlogging.level.org.springframework.web=TRACE \
-    -Dlogging.level.org.springframework.test=DEBUG ; \
-    echo "exit code: $?"
-
-# ...
-exit code: 0
+    -Dlogging.level.org.springframework.test=DEBUG \
+    -Dlogging.level.org.hibernate.SQL=DEBUG \
+    -Dspring.jpa.properties.hibernate.format_sql=true \
+    -Dlogging.level.org.hibernate.orm.jdbc.bind=TRACE \
+    -Dspring.jpa.properties.hibernate.use_sql_comments=true
 ```
 
 ```shell
@@ -60,10 +60,14 @@ exit code: 0
 # )
 $ ./mvnw \
     -q \
-    -Dtest=UserControllerTests#create_1 \
+    -Dtest=TransactionControllerTests#create_1 \
     -Dlogging.level.org.springframework.security=DEBUG \
     -Dlogging.level.org.springframework.web=TRACE \
     -Dlogging.level.org.springframework.test=DEBUG \
+    -Dlogging.level.org.hibernate.SQL=DEBUG \
+    -Dspring.jpa.properties.hibernate.format_sql=true \
+    -Dlogging.level.org.hibernate.orm.jdbc.bind=TRACE \
+    -Dspring.jpa.properties.hibernate.use_sql_comments=true \
     test ; \
     echo "exit code: $?"
 
@@ -129,11 +133,11 @@ $ (
 )
 
 UPDATE SUMMARY
-Run:                          9
+Run:                         17
 Previously run:               0
 Filtered out:                 0
 -------------------------------
-Total change sets:            9
+Total change sets:           17
 ```
 
 ```sql
@@ -153,17 +157,25 @@ mysql> select ID, FILENAME, DATEEXECUTED from DATABASECHANGELOG;
 +-----------------+--------------------------------------------+---------------------+
 | ID              | FILENAME                                   | DATEEXECUTED        |
 +-----------------+--------------------------------------------+---------------------+
-| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
-| 1791063470290-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
-| 1791224952245-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
-| 1791224952245-2 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
-| 1791224952245-3 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
-| 1791224952245-4 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
-| 1792698341395-1 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
-| 1792698341395-2 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
-| 1792698341395-3 | db/changelog/db.changelog-master.mysql.sql | 2026-10-25 19:23:34 |
+| 1790882019121-1 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1791063470290-1 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1791224952245-1 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1791224952245-2 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1791224952245-3 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1791224952245-4 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1792698341395-1 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1792698341395-2 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1792698341395-3 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1793049387342-1 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1793049387342-2 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1793308118386-1 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1793308118386-2 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1793529686613-1 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1793529686613-2 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1793629079887-1 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
+| 1793629079887-2 | db/changelog/db.changelog-master.mysql.sql | 2026-11-03 20:35:09 |
 +-----------------+--------------------------------------------+---------------------+
-9 rows in set (0.00 sec)
+17 rows in set (0.00 sec)
 ```
 
 
@@ -190,7 +202,18 @@ $ (
     source ./.env ;
 
     ./mvnw spring-boot:run \
-        -Dspring-boot.run.arguments=--logging.level.org.springframework.security=TRACE ;
+        -Dspring-boot.run.arguments="\
+            # the SQL statement itself (multi-line, readable)
+            --logging.level.org.springframework.security=DEBUG \
+            --logging.level.org.springframework.web=TRACE \
+            --logging.level.org.springframework.test=DEBUG \
+            --logging.level.org.hibernate.SQL=DEBUG \
+            --spring.jpa.properties.hibernate.format_sql=true \
+            # the values bound to the ? placeholders (:userId, :year)
+            --logging.level.org.hibernate.orm.jdbc.bind=TRACE \
+            # optional: puts the source JPQL in a comment above the SQL
+            --spring.jpa.properties.hibernate.use_sql_comments=true \
+    " ;
 )
 
 # ...

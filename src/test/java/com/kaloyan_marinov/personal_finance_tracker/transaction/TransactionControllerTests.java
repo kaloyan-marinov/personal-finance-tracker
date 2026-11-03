@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,11 +41,15 @@ class TransactionControllerTests {
     @Autowired 
     private RestTestClient restTestClient;
 
-    private String obtainAccessToken() {
+    private UserResponseCreate createUser(
+        String username,
+        String email,
+        String password
+    ) {
         UserRequestCreate userRequestCreate = new UserRequestCreate(
-            "test-" + "jd",
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+            username,
+            email,
+            password
         );
         UserResponseCreate userResponseCreate = restTestClient
             .post().uri("/api/v1/users")
@@ -56,12 +61,19 @@ class TransactionControllerTests {
             .getResponseBody()
         ;
 
+        return userResponseCreate;
+    }
+
+    private String obtainAccessToken(
+        String email,
+        String password
+    ) {
         TokenResponse tokenResponse = restTestClient
             .post().uri("/api/v1/tokens")
             .headers(
                 h -> h.setBasicAuth(
-                    userRequestCreate.email(),
-                    userRequestCreate.password()
+                    email,
+                    password
                 )
             )
             .exchange()
@@ -77,7 +89,15 @@ class TransactionControllerTests {
     @Test
     void create_1() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2001;
         BigDecimal amount = null;
@@ -117,7 +137,16 @@ class TransactionControllerTests {
     @Test
     void create_2() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2002;
         BigDecimal amount = new BigDecimal("-4.789");
@@ -163,7 +192,16 @@ class TransactionControllerTests {
     @Test
     void create_3() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
         int year = 2003;
         BigDecimal amount = new BigDecimal("-300.00");
         String currency = "EUR";
@@ -204,7 +242,16 @@ class TransactionControllerTests {
     @Test
     void create_4() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2004;
         BigDecimal amount = new BigDecimal("-400.00");
@@ -249,7 +296,16 @@ class TransactionControllerTests {
     @Test
     void create_5() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2005;
         BigDecimal amount = new BigDecimal("-500.00");
@@ -291,7 +347,16 @@ class TransactionControllerTests {
     @Test
     void create_6() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2006;
         BigDecimal amount = new BigDecimal("-600.00");
@@ -337,7 +402,16 @@ class TransactionControllerTests {
     @Test
     void create_7() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2007;
         BigDecimal amount = new BigDecimal("-700.00");
@@ -351,7 +425,7 @@ class TransactionControllerTests {
         );
 
         // Act.
-        Transaction transaction = restTestClient
+        TransactionResponse transactionResponse = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
@@ -359,17 +433,29 @@ class TransactionControllerTests {
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(Transaction.class)
+            .expectBody(TransactionResponse.class)
             .returnResult()
             .getResponseBody();
             
         // Assert.
-        assertEquals(transactionRequest.year(), transaction.getYear());
-        assertEquals(transactionRequest.amount(), transaction.getAmount());
-        assertEquals(transactionRequest.currency(), transaction.getCurrency());
-        assertEquals(transactionRequest.description(), transaction.getDescription());
+        assertEquals(
+            transactionRequest.year(),
+            transactionResponse.year()
+        );
+        assertEquals(
+            transactionRequest.amount(),
+            transactionResponse.amount()
+        );
+        assertEquals(
+            transactionRequest.currency(),
+            transactionResponse.currency()
+        );
+        assertEquals(
+            transactionRequest.description(),
+            transactionResponse.description()
+        );
             
-        long transactionId = transaction.getId();
+        long transactionId = transactionResponse.id();
         String expectedBodyJSON = """
             {
                 id: %d,
@@ -401,7 +487,16 @@ class TransactionControllerTests {
     @Test
     void create_8() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2008;
         BigDecimal amount = new BigDecimal("-800.00");
@@ -414,7 +509,7 @@ class TransactionControllerTests {
             description
         );
 
-        Transaction transaction = restTestClient
+        TransactionResponse transactionResponse = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
@@ -422,10 +517,10 @@ class TransactionControllerTests {
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(Transaction.class)
+            .expectBody(TransactionResponse.class)
             .returnResult()
             .getResponseBody();
-        long transactionId = transaction.getId();
+        long transactionId = transactionResponse.id();
 
         // Since `TransactionRequest` has no `id`,
         // the body of the new request will be built as a `Map`.
@@ -438,7 +533,7 @@ class TransactionControllerTests {
         );
 
         // Act.
-        Transaction newTransaction = restTestClient
+        TransactionResponse newTransactionResponse = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
@@ -446,12 +541,12 @@ class TransactionControllerTests {
             .body(newTransactionRequestWithId)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(Transaction.class)
+            .expectBody(TransactionResponse.class)
             .returnResult()
             .getResponseBody();
 
         // Assert.
-        long newTransactionId = newTransaction.getId();
+        long newTransactionId = newTransactionResponse.id();
         assertNotEquals(transactionId, newTransactionId);
 
         String expectedBodyJSON = """
@@ -482,10 +577,93 @@ class TransactionControllerTests {
             );
     }
 
+    /**
+     * Creates a user, obtains an access token for that user, and then deletes the user.
+     * POSTs a transaction with the (still unexpired) token.
+     * Expects a 401 response.
+     */
+    @Test
+    void create_9() {
+        // Arrange.
+        String username = "test-" + "jd";
+        String email = "test-" + "john.doe@protonmail.com";
+        String password = "test-" + "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
+
+        int year = 2008;
+        BigDecimal amount = new BigDecimal("-800.00");
+        String currency = "EUR";
+        String description = "groceries";
+        TransactionRequest transactionRequest = new TransactionRequest(
+            year,
+            amount,
+            currency,
+            description
+        );
+
+        restTestClient
+            .delete().uri("/api/v1/users/" + userResponseCreate.id())
+            .headers(
+                h -> h.setBasicAuth(
+                    email,
+                    password
+                )
+            )
+            .exchange()
+            .expectStatus().isEqualTo(HttpStatus.NO_CONTENT)
+            .expectBody().isEmpty()
+        ;
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(transactionRequest)
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON = 
+            """
+            {
+                "error": "unauthorized to create a transaction"
+            }
+            """
+        ;
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
+            .expectBody().json(
+                expectedBodyJSON,
+                JsonCompareMode.STRICT
+            )
+        ;
+    }
+
     @Test
     void retrieveOne_1() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         long nonexistentId = 17;
 
@@ -503,7 +681,16 @@ class TransactionControllerTests {
     @Test
     void retrieveOne_2() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2002;
         BigDecimal amount = new BigDecimal("-200.00");
@@ -516,7 +703,7 @@ class TransactionControllerTests {
             description
         );
 
-        Transaction transaction = restTestClient
+        TransactionResponse transactionResponse = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
@@ -524,10 +711,10 @@ class TransactionControllerTests {
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(Transaction.class)
+            .expectBody(TransactionResponse.class)
             .returnResult()
             .getResponseBody();
-        long transactionId = transaction.getId();
+        long transactionId = transactionResponse.id();
 
         // Act + Assert.
         String expectedBodyJSON = """
@@ -556,7 +743,16 @@ class TransactionControllerTests {
     @Test
     void retrieveAll_1() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         String expectedBodyJSON = """
             []
@@ -579,7 +775,16 @@ class TransactionControllerTests {
     @Test
     void retrieveAll_2() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year6 = 2006;
         BigDecimal amount6 = new BigDecimal("-600.00");
@@ -603,7 +808,7 @@ class TransactionControllerTests {
             description7
         );
 
-        Transaction transaction6 = restTestClient
+        TransactionResponse transactionResponse6 = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
@@ -611,11 +816,11 @@ class TransactionControllerTests {
             .body(transactionRequest6)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(Transaction.class)
+            .expectBody(TransactionResponse.class)
             .returnResult()
             .getResponseBody();
         
-        Transaction transaction7 = restTestClient
+        TransactionResponse transactionResponse7 = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
@@ -623,7 +828,7 @@ class TransactionControllerTests {
             .body(transactionRequest7)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(Transaction.class)
+            .expectBody(TransactionResponse.class)
             .returnResult()
             .getResponseBody();
 
@@ -646,8 +851,8 @@ class TransactionControllerTests {
                 }
             ]
         """.formatted(
-            transaction6.getId(),
-            transaction7.getId()
+            transactionResponse6.id(),
+            transactionResponse7.id()
         );
 
         restTestClient
@@ -666,7 +871,16 @@ class TransactionControllerTests {
     @Test
     void update_1() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 3000 + 2003;
         BigDecimal amount = new BigDecimal(
@@ -681,7 +895,7 @@ class TransactionControllerTests {
             description
         );
 
-        Transaction transaction = restTestClient
+        TransactionResponse transactionResponse = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
@@ -689,10 +903,10 @@ class TransactionControllerTests {
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(Transaction.class)
+            .expectBody(TransactionResponse.class)
             .returnResult()
             .getResponseBody();
-        long transactionId = transaction.getId();
+        long transactionId = transactionResponse.id();
 
         Integer updatedYear = null;
         BigDecimal updatedAmount = new BigDecimal("-300.00");
@@ -754,7 +968,16 @@ class TransactionControllerTests {
     @Test
     void update_2() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2004;
         BigDecimal amount = new BigDecimal("-400.00");
@@ -784,7 +1007,16 @@ class TransactionControllerTests {
     @Test
     void update_3() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 3000 + 2005;
         BigDecimal amount = new BigDecimal(
@@ -799,7 +1031,7 @@ class TransactionControllerTests {
             description
         );
 
-        Transaction transaction = restTestClient
+        TransactionResponse transactionResponse = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
@@ -807,10 +1039,10 @@ class TransactionControllerTests {
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(Transaction.class)
+            .expectBody(TransactionResponse.class)
             .returnResult()
             .getResponseBody();
-        long transactionId = transaction.getId();
+        long transactionId = transactionResponse.id();
 
         int updatedYear = 2005;
         BigDecimal updatedAmount = new BigDecimal("-500.00");
@@ -863,7 +1095,16 @@ class TransactionControllerTests {
     @Test
     void delete_1() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         long nonexistentId = 17;
 
@@ -881,7 +1122,16 @@ class TransactionControllerTests {
     @Test
     void delete_2() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        UserResponseCreate userResponseCreate = createUser(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+
+        String accessToken = obtainAccessToken(
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2006;
         BigDecimal amount = new BigDecimal("-600.00");
@@ -894,7 +1144,7 @@ class TransactionControllerTests {
             description
         );
 
-        Transaction transaction = restTestClient
+        TransactionResponse transactionResponse = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
@@ -902,10 +1152,10 @@ class TransactionControllerTests {
             .body(transactionRequest)
             .exchange()
             .expectStatus().isCreated()
-            .expectBody(Transaction.class)
+            .expectBody(TransactionResponse.class)
             .returnResult()
             .getResponseBody();
-        long transactionId = transaction.getId();
+        long transactionId = transactionResponse.id();
 
         // Act + Assert.
         restTestClient
@@ -925,5 +1175,129 @@ class TransactionControllerTests {
             .exchange()
             .expectStatus().isNotFound()
             .expectBody().isEmpty();
+    }
+
+    /*
+    Q:
+    Why does this test case fail with
+    `Status expected:<409 CONFLICT> but was:<204 NO_CONTENT>`
+    instead of a 500
+    (given that `fk_transactions_user_id` should reject the `DELETE`)?
+
+    A:
+    Because the `DELETE` statement never reaches the database.
+
+    1. This test class is annotated with `@Transactional`,
+       and `RestTestClient` is bound to `MockMvc`,
+       which runs the controller on the test's own thread.
+       So `UserController.delete` joins the test's transaction
+       instead of getting its own.
+
+    2. `userRepository.delete(...)` calls `EntityManager.remove(...)`,
+       which only marks the entity as removed;
+       Hibernate saves the `DELETE` for the next flush.
+
+       (
+       The `INSERT`s, on the other hand, are executed immediately,
+       because `GenerationType.IDENTITY` requires Hibernate
+       to execute each `INSERT` in order to obtain the generated id.
+       )
+
+    3. Nothing flushes after the removal:
+       the repository's `@Transactional` merely joins the existing transaction
+       (so it doesn't commit),
+       and no later query touches `users`
+       (so auto-flush never runs).
+       The controller returns 204.
+
+    4. When the test method ends, Spring rolls back the transaction,
+       which discards the pending `DELETE` without ever executing it.
+       So the foreign key is never checked.
+
+    In production, there is no surrounding transaction:
+    the repository's own transaction commits,
+    the flush executes the `DELETE`,
+    MySQL rejects it,
+    and (because nothing catches that exception) the client gets a 500.
+
+    Possible fixes:
+    - (recommended)
+      before deleting, check for owned rows
+      (e.g. `transactionRepository.existsByUser(user)`, and similarly for exchange rates)
+      and return 409 if any exist;
+      this doesn't depend on when Hibernate flushes;
+    - call `userRepository.flush()` right after `delete`,
+      inside a `try` that catches `DataIntegrityViolationException` and returns 409;
+    - remove `@Transactional` from this test class
+      (which requires cleaning up data between tests manually).
+    */
+    /**
+     * If a user owns any `Transaction`s,
+     * an attempt to delete that user should be refused with a 409.
+     */
+    @Test
+    void delete_user() {
+        // Arrange.
+        String username = "jd";
+        String email = "john.doe@protonmail.com";
+        String password = "123";
+
+        UserResponseCreate userResponseCreate = createUser(
+            username,
+            email,
+            password
+        );
+
+        String accessToken = obtainAccessToken(
+            email,
+            password
+        );
+
+        TransactionRequest transactionRequest1 = new TransactionRequest(
+            2006,
+            new BigDecimal("-600.00"),
+            "EUR",
+            "groceries"
+        );
+        TransactionResponse transactionResponse1 = restTestClient
+            .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(transactionRequest1)
+            .exchange()
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
+            .expectBody(TransactionResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .delete().uri("/api/v1/users/" + userResponseCreate.id())
+            .headers(
+                h -> h.setBasicAuth(
+                    email,
+                    password
+                )
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON = 
+            """
+            {
+                "error": "unable to delete your user, because you still have transactions"
+            }
+            """
+        ;
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.CONFLICT)
+            .expectBody().json(
+                expectedBodyJSON,
+                JsonCompareMode.STRICT
+            )
+        ;
     }
 }

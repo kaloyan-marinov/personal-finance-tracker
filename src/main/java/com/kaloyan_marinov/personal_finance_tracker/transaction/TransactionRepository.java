@@ -1,6 +1,7 @@
 package com.kaloyan_marinov.personal_finance_tracker.transaction;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
@@ -16,6 +17,12 @@ That «bean definition» has almost the same name as the class
 In this case, the name will of the «bean definition» be `transactionRepository`.
  */
 public interface TransactionRepository extends CrudRepository<Transaction, Long> {
+
+    boolean existsByUserId(Long userId);
+
+    Optional<Transaction> findByIdAndUserId(Long id, Long userId);
+
+    List<Transaction> findAllByUserId(Long userId);
 
     /**
      * The summing happens in the database,
@@ -63,6 +70,8 @@ public interface TransactionRepository extends CrudRepository<Transaction, Long>
         FROM
             Transaction t
         WHERE
+            t.user.id = :userId
+            AND
             t.year = :year
             AND
             t.amount != 0
@@ -72,6 +81,17 @@ public interface TransactionRepository extends CrudRepository<Transaction, Long>
             t.currency
     """)
     List<CurrencyTotal> sumAmountsByCurrencyAndSign(
+        /*
+        Each `@Param` binds its parameter to the `:name` of the same name in the query.
+
+        Without `@Param`, «Spring Data» would read the names from the compiled class,
+        which only keeps them if the compiler runs with the `-parameters` flag.
+        «Spring Boot»'s parent POM turns that flag on,
+        but a build without it (e.g. some IDE builds) would make the application fail at startup.
+
+        So every parameter gets an explicit `@Param`.
+        */
+        @Param("userId") Long userId,
         @Param("year") Integer year
     );
 }

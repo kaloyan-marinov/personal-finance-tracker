@@ -12,6 +12,9 @@ import java.util.Set;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -50,9 +53,28 @@ public class TotalsController {
         // and reports a violation as a `HandlerMethodValidationException`.
         // A missing `currency` is `null`, which `@Pattern` accepts.
         // )
-        @RequestParam(required = false) @Pattern(regexp = "^[A-Z]{3}$") String currency
+        @RequestParam(required = false) @Pattern(regexp = "^[A-Z]{3}$") String currency,
+        Authentication authentication
     ) {
-        List<CurrencyTotal> currencyTotals = transactionRepository.sumAmountsByCurrencyAndSign(year);
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
+        List<CurrencyTotal> currencyTotals = transactionRepository.sumAmountsByCurrencyAndSign(userId, year);
 
         if (currency == null) {
             // Report totals for each currency.
@@ -72,6 +94,7 @@ public class TotalsController {
         );
         Map<String, BigDecimal> currencyNeedingToBeConverted_2_exchangeRateFactor =
             loadSrcCurrency_2_exchangeRateFactor(
+                userId,
                 year,
                 currency,
                 currenciesNeedingToBeConverted
@@ -153,6 +176,7 @@ public class TotalsController {
     // Only direct rates (`sourceCurrency` -> `targetCurrency`) are looked up;
     // inverse and chained rates are deliberately not used.
     private Map<String, BigDecimal> loadSrcCurrency_2_exchangeRateFactor(
+        Long userId,
         Integer year,
         String targetCurrency,
         Set<String> sourceCurrencies
@@ -166,7 +190,7 @@ public class TotalsController {
         }
 
         List<ExchangeRate> exchangeRates = exchangeRateRepository
-            .findByYearAndTargetCurrencyAndSourceCurrencyIn(year, targetCurrency, sourceCurrencies);
+            .findByUserIdAndYearAndTargetCurrencyAndSourceCurrencyIn(userId, year, targetCurrency, sourceCurrencies);
         for (ExchangeRate er : exchangeRates) {
             srcCurrency_2_exchangeRateFactor.put(
                 er.getSourceCurrency(),

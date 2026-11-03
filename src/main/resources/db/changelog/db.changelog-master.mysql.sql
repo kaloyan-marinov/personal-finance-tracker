@@ -59,3 +59,27 @@ ALTER TABLE users ADD CONSTRAINT uq_users_email UNIQUE (email);
 -- changeset kaloyan:1792698341395-3 splitStatements:false
 ALTER TABLE users ADD CONSTRAINT uq_users_username UNIQUE (username);
 
+-- changeset kaloyan:1793049387342-1 splitStatements:false
+ALTER TABLE transactions ADD user_id BIGINT NOT NULL;
+
+-- changeset kaloyan:1793049387342-2 splitStatements:false
+ALTER TABLE transactions ADD CONSTRAINT fk_transactions_user_id FOREIGN KEY (user_id) REFERENCES users (id);
+
+-- changeset kaloyan:1793308118386-1 splitStatements:false
+ALTER TABLE exchange_rates ADD user_id BIGINT NOT NULL;
+
+-- changeset kaloyan:1793308118386-2 splitStatements:false
+ALTER TABLE exchange_rates ADD CONSTRAINT fk_exchange_rates_user_id FOREIGN KEY (user_id) REFERENCES users (id);
+
+-- changeset kaloyan:1793529686613-1 splitStatements:false
+ALTER TABLE exchange_rates ADD CONSTRAINT uq_exchange_rates_user_id_year_currencies UNIQUE (user_id, year_, source_currency, target_currency);
+
+-- changeset kaloyan:1793529686613-2 splitStatements:false
+ALTER TABLE exchange_rates DROP CONSTRAINT uq_exchange_rates_year_currencies;
+
+-- changeset kaloyan:1793629079887-1 splitStatements:false
+CREATE INDEX idx_transactions_user_id_year_currency ON transactions(user_id, year_, currency);
+
+-- changeset kaloyan:1793629079887-2 splitStatements:false
+DROP INDEX idx_transactions_year_currency ON transactions;
+

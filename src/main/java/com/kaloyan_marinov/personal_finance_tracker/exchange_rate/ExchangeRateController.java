@@ -1,11 +1,15 @@
 package com.kaloyan_marinov.personal_finance_tracker.exchange_rate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,6 +18,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.kaloyan_marinov.personal_finance_tracker.user.UserRepository;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
@@ -35,21 +41,57 @@ import jakarta.validation.constraints.Pattern;
 public class ExchangeRateController {
 
     private ExchangeRateRepository exchangeRateRepository;
+    private UserRepository userRepository;
 
-    public ExchangeRateController(ExchangeRateRepository exchangeRateRepository) {
+    public ExchangeRateController(
+        ExchangeRateRepository exchangeRateRepository,
+        UserRepository userRepository
+    ) {
         this.exchangeRateRepository = exchangeRateRepository;
+        this.userRepository = userRepository;
     }
 
     // The return type is `ResponseEntity<?>`,
-    // because the body is either the created `ExchangeRate` or an error.
+    // because the body is either the created `ExchangeRateResponse` or an error.
     @PostMapping("")
     public ResponseEntity<?> create(
-        @Valid @RequestBody ExchangeRateRequestCreate exchangeRateRequestCreate
+        @Valid @RequestBody ExchangeRateRequestCreate exchangeRateRequestCreate,
+        Authentication authentication
     ) {
-        // `uq_exchange_rates_year_currencies` remains the guarantee
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
+        if (!userRepository.existsById(userId)) {
+            return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(
+                    Map.of(
+                        "error", "unauthorized to create an exchange rate"
+                    )
+                )
+            ;
+        }
+
+        // `uq_exchange_rates_user_id_year_currencies` remains the guarantee
         // (e.g. for writes that bypass the endpoints);
         // this check merely gives the client a 409 rather than a database error.
-        boolean exists = exchangeRateRepository.existsByYearAndSourceCurrencyAndTargetCurrency(
+        boolean exists = exchangeRateRepository.existsByUserIdAndYearAndSourceCurrencyAndTargetCurrency(
+            userId,
             exchangeRateRequestCreate.year(),
             exchangeRateRequestCreate.sourceCurrency(),
             exchangeRateRequestCreate.targetCurrency()
@@ -58,7 +100,11 @@ public class ExchangeRateController {
         if (exists) {
             return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(Map.of("error", "Exchange rate already exists"))
+                .body(
+                    Map.of(
+                        "error", "Exchange rate already exists"
+                    )
+                )
             ;
         }
 
@@ -68,66 +114,168 @@ public class ExchangeRateController {
             exchangeRateRequestCreate.targetCurrency(),
             exchangeRateRequestCreate.sourceToTargetFactor()
         );
-        ExchangeRate createdExchangeRate = exchangeRateRepository.save(er);
+        er.setUser(
+            /*
+            (The user's existence is checked separately above, via `existsById`.)
 
+            The following returns a proxy that holds only the ID, without running a SELECT;
+            that's all Hibernate needs to write `user_id`.
+            */
+            userRepository.getReferenceById(userId)
+        );
+        exchangeRateRepository.save(er);
+
+        ExchangeRateResponse erResponse = new ExchangeRateResponse(
+            er.getId(),
+            er.getYear(),
+            er.getSourceCurrency(),
+            er.getTargetCurrency(),
+            er.getSourceToTargetFactor()
+        );
         return ResponseEntity
             .status(HttpStatus.CREATED)
-            .body(createdExchangeRate)
+            .body(erResponse)
         ;
     }
 
     @GetMapping("/{year}/{sourceCurrency}/{targetCurrency}")
-    public ResponseEntity<ExchangeRate> retrieveOne(
+    public ResponseEntity<ExchangeRateResponse> retrieveOne(
         @PathVariable Integer year,
         @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String sourceCurrency,
-        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String targetCurrency
+        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String targetCurrency,
+        Authentication authentication
     ) {
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
         Optional<ExchangeRate> optionalExchangeRate = exchangeRateRepository
-            .findByYearAndSourceCurrencyAndTargetCurrency(year, sourceCurrency, targetCurrency);
+            .findByUserIdAndYearAndSourceCurrencyAndTargetCurrency(userId, year, sourceCurrency, targetCurrency);
 
         if (optionalExchangeRate.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+        ExchangeRate er = optionalExchangeRate.get();
 
+        ExchangeRateResponse erResponse = new ExchangeRateResponse(
+            er.getId(),
+            er.getYear(),
+            er.getSourceCurrency(),
+            er.getTargetCurrency(),
+            er.getSourceToTargetFactor()
+        );
         return ResponseEntity
             .status(HttpStatus.OK)
-            .body(optionalExchangeRate.get())
+            .body(erResponse)
         ;
     }
 
     @GetMapping("")
-    public ResponseEntity<List<ExchangeRate>> retrieveAll() {
-        List<ExchangeRate> exchangeRates = exchangeRateRepository.findAll();
+    public ResponseEntity<List<ExchangeRateResponse>> retrieveAll(
+        Authentication authentication
+    ) {
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
+        List<ExchangeRate> exchangeRates = exchangeRateRepository.findAllByUserId(userId);
+
+        List<ExchangeRateResponse> erResponses = new ArrayList<>();
+        for (ExchangeRate er : exchangeRates) {
+            ExchangeRateResponse erR = new ExchangeRateResponse(
+                er.getId(),
+                er.getYear(),
+                er.getSourceCurrency(),
+                er.getTargetCurrency(),
+                er.getSourceToTargetFactor()
+            );
+            erResponses.add(erR);
+        }
 
         return ResponseEntity
             .status(HttpStatus.OK)
-            .body(exchangeRates)
+            .body(erResponses)
         ;
     }
 
     // Only `sourceToTargetFactor` changes;
     // a missing rate is not created (404 instead).
     @PutMapping("/{year}/{sourceCurrency}/{targetCurrency}")
-    public ResponseEntity<ExchangeRate> update(
+    public ResponseEntity<ExchangeRateResponse> update(
         @PathVariable Integer year,
         @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String sourceCurrency,
         @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String targetCurrency,
-        @Valid @RequestBody ExchangeRateRequestUpdate exchangeRateRequestUpdate
+        @Valid @RequestBody ExchangeRateRequestUpdate exchangeRateRequestUpdate,
+        Authentication authentication
     ) {
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
         Optional<ExchangeRate> optionalExchangeRate = exchangeRateRepository
-            .findByYearAndSourceCurrencyAndTargetCurrency(year, sourceCurrency, targetCurrency);
+            .findByUserIdAndYearAndSourceCurrencyAndTargetCurrency(userId, year, sourceCurrency, targetCurrency);
 
         if (optionalExchangeRate.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
 
         ExchangeRate er = optionalExchangeRate.get();
+
         er.setSourceToTargetFactor(exchangeRateRequestUpdate.sourceToTargetFactor());
         exchangeRateRepository.save(er);
 
+        ExchangeRateResponse erR = new ExchangeRateResponse(
+            er.getId(),
+            er.getYear(),
+            er.getSourceCurrency(),
+            er.getTargetCurrency(),
+            er.getSourceToTargetFactor()
+        );
         return ResponseEntity
             .status(HttpStatus.OK)
-            .body(er)
+            .body(erR)
         ;
     }
 
@@ -135,16 +283,37 @@ public class ExchangeRateController {
     public ResponseEntity<Void> delete(
         @PathVariable Integer year,
         @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String sourceCurrency,
-        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String targetCurrency
+        @PathVariable @Pattern(regexp = "^[A-Z]{3}$") String targetCurrency,
+        Authentication authentication
     ) {
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
         Optional<ExchangeRate> optionalExchangeRate = exchangeRateRepository
-            .findByYearAndSourceCurrencyAndTargetCurrency(year, sourceCurrency, targetCurrency);
+            .findByUserIdAndYearAndSourceCurrencyAndTargetCurrency(userId, year, sourceCurrency, targetCurrency);
 
         if (optionalExchangeRate.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
 
-        exchangeRateRepository.delete(optionalExchangeRate.get());
+        ExchangeRate er = optionalExchangeRate.get();
+
+        exchangeRateRepository.delete(er);
 
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }

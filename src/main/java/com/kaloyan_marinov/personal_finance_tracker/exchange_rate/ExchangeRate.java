@@ -5,12 +5,18 @@ import java.math.BigDecimal;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.kaloyan_marinov.personal_finance_tracker.user.User;
+
 import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
@@ -22,8 +28,8 @@ import jakarta.validation.constraints.Pattern;
 @Table(
     name = "exchange_rates",
     uniqueConstraints = @UniqueConstraint(
-        name = "uq_exchange_rates_year_currencies",
-        columnNames = { "year_", "source_currency", "target_currency" }
+        name = "uq_exchange_rates_user_id_year_currencies",
+        columnNames = { "user_id", "year_", "source_currency", "target_currency" }
     ),
     check = {
         @CheckConstraint(
@@ -40,6 +46,28 @@ public class ExchangeRate {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    // MySQL - more specifically, its storage engine InnoDB - creates an index for the foreign key on its own,
+    // with a name you don't control.
+    @ManyToOne(
+        // By default, a `@ManyToOne` loads eagerly,
+        // which would cause every load of an `ExchangeRate` to also load its `User`;
+        // that is avoided by the following setting.
+        fetch = FetchType.LAZY,
+        // The following is a hint to Hibernate.
+        optional = false
+    )
+    @JoinColumn(
+        name = "user_id",
+        // The following produces a `NOT NULL` in the database schema.
+        nullable = false,
+        // Without the following setting,
+        // Hibernate would generate a name like `FKqwe8...`, which `liquibase:diff` would go on to copy.
+        foreignKey = @ForeignKey(
+            name = "fk_exchange_rates_user_id"
+        )
+    )
+    private User user;
 
     // According to https://www.h2database.com/html/advanced.html ,
     // `YEAR` is a reserved SQL keyword in H2.
@@ -102,6 +130,14 @@ public class ExchangeRate {
 
     public Long getId() {
         return id;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 
     public Integer getYear() {

@@ -1,9 +1,15 @@
 package com.kaloyan_marinov.personal_finance_tracker.transaction;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kaloyan_marinov.personal_finance_tracker.user.UserRepository;
+
 import jakarta.validation.Valid;
 
 @RestController
@@ -20,33 +28,104 @@ import jakarta.validation.Valid;
 public class TransactionController {
 
     private TransactionRepository transactionRepository;
+    private UserRepository userRepository;
 
-    public TransactionController(TransactionRepository transactionRepository) {
+    public TransactionController(
+        TransactionRepository transactionRepository,
+        UserRepository userRepository
+    ) {
         this.transactionRepository = transactionRepository;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("")
-    public ResponseEntity<Transaction> create(
-        @Valid @RequestBody TransactionRequest transactionRequest
+    public ResponseEntity<?> create(
+        @Valid @RequestBody TransactionRequest transactionRequest,
+        Authentication authentication
     ) {
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
+        if (!userRepository.existsById(userId)) {
+            return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(
+                    Map.of(
+                        "error", "unauthorized to create a transaction"
+                    )
+                )
+            ;
+        }
+
         Transaction t = new Transaction();
+        t.setUser(
+            /*
+            (The user's existence is checked separately above, via `existsById`.)
+
+            The following returns a proxy that holds only the ID, without running a SELECT;
+            that's all Hibernate needs to write `user_id`.
+            */
+            userRepository.getReferenceById(userId)
+        );
+
         t.setYear(transactionRequest.year());
         t.setAmount(transactionRequest.amount());
         t.setCurrency(transactionRequest.currency());
         t.setDescription(transactionRequest.description());
         Transaction createdTransaction = transactionRepository.save(t);
 
+        TransactionResponse transactionResponse = new TransactionResponse(
+            createdTransaction.getId(),
+            createdTransaction.getYear(),
+            createdTransaction.getAmount(),
+            createdTransaction.getCurrency(),
+            createdTransaction.getDescription()
+        );
         return ResponseEntity
             .status(HttpStatus.CREATED)
-            .body(createdTransaction)
+            .body(transactionResponse)
         ;
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Transaction> retrieveOne(
-        @PathVariable Long id
+    public ResponseEntity<TransactionResponse> retrieveOne(
+        @PathVariable Long id,
+        Authentication authentication
     ) {
-        Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
+        Optional<Transaction> optionalTransaction = transactionRepository.findByIdAndUserId(id, userId);
 
         Transaction transaction = optionalTransaction.orElse(null);
 
@@ -54,28 +133,86 @@ public class TransactionController {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
 
+        TransactionResponse transactionResponse = new TransactionResponse(
+            transaction.getId(),
+            transaction.getYear(),
+            transaction.getAmount(),
+            transaction.getCurrency(),
+            transaction.getDescription()
+        );
         return ResponseEntity
             .status(HttpStatus.OK)
-            .body(transaction)
+            .body(transactionResponse)
         ;
     }
     
     @GetMapping("")
-    public ResponseEntity<Iterable<Transaction>> retrieveAll() {
-        Iterable<Transaction> transactions = transactionRepository.findAll();
+    public ResponseEntity<Iterable<TransactionResponse>> retrieveAll(
+        Authentication authentication
+    ) {
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
+        Iterable<Transaction> transactions = transactionRepository.findAllByUserId(userId);
+
+        List<TransactionResponse> transactionResponses = new ArrayList<>();
+        for (Transaction t : transactions) {
+            TransactionResponse trR = new TransactionResponse(
+                t.getId(),
+                t.getYear(),
+                t.getAmount(),
+                t.getCurrency(),
+                t.getDescription()
+            );
+            transactionResponses.add(trR);
+        }
 
         return ResponseEntity
             .status(HttpStatus.OK)
-            .body(transactions)
+            .body(transactionResponses)
         ;
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Transaction> update(
+    public ResponseEntity<TransactionResponse> update(
         @PathVariable Long id,
-        @Valid @RequestBody TransactionRequest transactionRequest
+        @Valid @RequestBody TransactionRequest transactionRequest,
+        Authentication authentication
     ) {
-        Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
+        Optional<Transaction> optionalTransaction = transactionRepository.findByIdAndUserId(id, userId);
 
         if (optionalTransaction.isPresent()) {
             Transaction t = optionalTransaction.get();
@@ -84,11 +221,18 @@ public class TransactionController {
             t.setAmount(transactionRequest.amount());
             t.setCurrency(transactionRequest.currency());
             t.setDescription(transactionRequest.description());
-            transactionRepository.save(t);
+            Transaction updatedTransaction = transactionRepository.save(t);
 
+            TransactionResponse transactionResponse = new TransactionResponse(
+                updatedTransaction.getId(),
+                updatedTransaction.getYear(),
+                updatedTransaction.getAmount(),
+                updatedTransaction.getCurrency(),
+                updatedTransaction.getDescription()
+            );
             return ResponseEntity
                 .status(HttpStatus.OK)
-                .body(t)
+                .body(transactionResponse)
             ;
         }
 
@@ -97,15 +241,35 @@ public class TransactionController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
-        @PathVariable Long id
+        @PathVariable Long id,
+        Authentication authentication
     ) {
-        Optional<Transaction> optionalTransaction = transactionRepository.findById(id);
+        /*
+        An alternative implementation would be
+        to replace the `Authentication authentication` parameter with `@AuthenticationPrincipal Jwt jwt`
+        and to replace the following 6 lines with
+        `Long userId = jwt.getClaim("userId");`.
+
+        That works because,
+        after a successful Bearer authentication,
+        «Spring Security» stores a `JwtAuthenticationToken` whose principal is the `Jwt` itself,
+        and `@AuthenticationPrincipal` resolves the parameter from that principal.
+        */
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new IllegalStateException("expected a JWT-based authentication");
+        }
+        JwtAuthenticationToken jwtAuthToken = (JwtAuthenticationToken) authentication;
+        Jwt jwt = jwtAuthToken.getToken();
+        Long userId = jwt.getClaim("userId");
+
+        Optional<Transaction> optionalTransaction = transactionRepository.findByIdAndUserId(id, userId);
 
         if (optionalTransaction.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
 
         Transaction t = optionalTransaction.get();
+
         transactionRepository.delete(t);
 
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);

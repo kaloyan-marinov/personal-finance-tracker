@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kaloyan_marinov.personal_finance_tracker.exchange_rate.ExchangeRateRepository;
+import com.kaloyan_marinov.personal_finance_tracker.transaction.TransactionRepository;
+
 import jakarta.validation.Valid;
 
 @RestController
@@ -25,12 +28,20 @@ public class UserController {
 
     private final PasswordEncoder passwordEncoder;
 
+    private final TransactionRepository transactionRepository;
+    private final ExchangeRateRepository exchangeRateRepository;
+
     public UserController(
         UserRepository userRepository,
-        PasswordEncoder passwordEncoder
+        PasswordEncoder passwordEncoder,
+        TransactionRepository transactionRepository,
+        ExchangeRateRepository exchangeRateRepository
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+
+        this.transactionRepository = transactionRepository;
+        this.exchangeRateRepository = exchangeRateRepository;
     }
 
     @PostMapping("")
@@ -133,7 +144,33 @@ public class UserController {
         if (!authenticatedUser.getId().equals(id)) {
             return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(Map.of("error", "not allowed to delete a user other than the authenticated one"))
+                .body(
+                    Map.of(
+                        "error", "not allowed to delete a user other than the authenticated one"
+                    )
+                )
+            ;
+        }
+
+        if (transactionRepository.existsByUserId(id)) {
+            return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(
+                    Map.of(
+                        "error", "unable to delete your user, because you still have transactions"
+                    )
+                )
+            ;
+        }
+
+        if (exchangeRateRepository.existsByUserId(id)) {
+            return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(
+                    Map.of(
+                        "error", "unable to delete your user, because you still have exchange rates"
+                    )
+                )
             ;
         }
 

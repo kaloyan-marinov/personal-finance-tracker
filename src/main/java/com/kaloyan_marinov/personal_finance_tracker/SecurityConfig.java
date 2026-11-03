@@ -164,7 +164,7 @@ public class SecurityConfig {
      * 
      * - The property names are your own, so the `pft.` prefix is just a convention.
      * 
-     * Spring Boot's «relaxed binding» maps the environment variable
+     * «Spring Boot»'s «relaxed binding» maps the environment variable
      * `PFT_SECURITY_SECRET_KEY` to the property `pft.security.secret.key`
      * (uppercase it, and replace `.` with `_`).
      */

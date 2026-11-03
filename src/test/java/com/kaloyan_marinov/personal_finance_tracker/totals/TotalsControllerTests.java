@@ -43,11 +43,15 @@ class TotalsControllerTests {
     @Autowired
     private RestTestClient restTestClient;
 
-    private String obtainAccessToken() {
+    private String obtainAccessToken(
+        String username,
+        String email,
+        String password
+    ) {
         UserRequestCreate userRequestCreate = new UserRequestCreate(
-            "test-" + "jd",
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+            username,
+            email,
+            password
         );
         UserResponseCreate userResponseCreate = restTestClient
             .post().uri("/api/v1/users")
@@ -80,7 +84,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_01() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         // Act + Assert.
         String expectedBodyJSON = """
@@ -108,7 +116,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_02() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         String nonIntegerYear = "abc";
 
@@ -138,7 +150,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_03() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2030;
 
@@ -175,7 +191,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_04() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2026;
 
@@ -227,7 +247,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_05() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2026;
 
@@ -274,7 +298,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_06() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2030;
         String currencyToReportTotalsIn = "EUR";
@@ -314,7 +342,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_07() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         // Act + Assert.
         String expectedBodyJSON = """
@@ -349,7 +381,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_08() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         String currencyToReportTotalsIn = "eur";
 
@@ -391,7 +427,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_09() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2026;
         String currencyToReportTotalsIn = "EUR";
@@ -464,7 +504,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_10() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2026;
         String currencyToReportTotalsIn = "EUR";
@@ -502,7 +546,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_11() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2026;
         String currencyToReportTotalsIn = "GBP";
@@ -546,7 +594,11 @@ class TotalsControllerTests {
     @Test
     void computeTotals_12() {
         // Arrange.
-        String accessToken = obtainAccessToken();
+        String accessToken = obtainAccessToken(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
 
         int year = 2026;
         String currencyToReportTotalsIn = "EUR";
@@ -596,6 +648,7 @@ class TotalsControllerTests {
         int year,
         String amount,
         String currency
+        // String description
     ) {
         TransactionRequest transactionRequest = new TransactionRequest(
             year,
