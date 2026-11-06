@@ -1,6 +1,6 @@
 package com.kaloyan_marinov.personal_finance_tracker.totals;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.Assertions;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -15,8 +15,8 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kaloyan_marinov.personal_finance_tracker.Utilities;
 import com.kaloyan_marinov.personal_finance_tracker.exchange_rate.ExchangeRateRequestCreate;
-import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
 import com.kaloyan_marinov.personal_finance_tracker.transaction.Transaction;
 import com.kaloyan_marinov.personal_finance_tracker.transaction.TransactionRequest;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
@@ -43,136 +43,156 @@ class TotalsControllerTests {
     @Autowired
     private RestTestClient restTestClient;
 
-    private String obtainAccessToken(
-        String username,
-        String email,
-        String password
-    ) {
-        UserRequestCreate userRequestCreate = new UserRequestCreate(
-            username,
-            email,
-            password
-        );
-        UserResponseCreate userResponseCreate = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        TokenResponse tokenResponse = restTestClient
-            .post().uri("/api/v1/tokens")
-            .headers(
-                h -> h.setBasicAuth(
-                    userRequestCreate.email(),
-                    userRequestCreate.password()
-                )
-            )
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody(TokenResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return tokenResponse.accessToken();
-    }
-
     @Test
     void computeTotals_01() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/totals")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "year": "must be provided"
                 }
             }
-        """;
+            """
+        ;
 
-        restTestClient
-            .get().uri("/api/v1/totals")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .exchange()
-            .expectStatus().isBadRequest()
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     @Test
     void computeTotals_02() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
 
-        String nonIntegerYear = "abc";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        String inadmissibleYear = "abc";
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/totals?year=" + inadmissibleYear)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "year": "must be of type Integer"
                 }
             }
-        """;
+            """
+        ;
 
-        restTestClient
-            .get().uri("/api/v1/totals?year=" + nonIntegerYear)
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .exchange()
-            .expectStatus().isBadRequest()
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     @Test
     void computeTotals_03() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
 
         int year = 2030;
 
-        createTransaction(accessToken, year - 1, "-10.00", "EUR");
+        TransactionRequest transactionRequest = new TransactionRequest(
+            year - 1,
+            new BigDecimal("-10.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequest
+        );
 
         // Act.
-        TotalsResponse observed = restTestClient
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/totals?year=" + year)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
-            .expectBody(TotalsResponse.class)
-            .returnResult()
-            .getResponseBody();
+        ;
 
         // Assert.
+        TotalsResponse observed = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody(TotalsResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
         Map<String, BigDecimal> expectedExpenses = Map.of();
         Map<String, BigDecimal> expectedIncomes = Map.of();
         TotalsResponse expected = new TotalsResponse(
@@ -180,7 +200,7 @@ class TotalsControllerTests {
             expectedExpenses,
             expectedIncomes
         );
-        assertEquals(expected, observed);
+        Assertions.assertEquals(expected, observed);
     }
 
     /**
@@ -191,36 +211,116 @@ class TotalsControllerTests {
     @Test
     void computeTotals_04() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
 
         int year = 2026;
 
-        createTransaction(accessToken, year, "-10.00", "EUR");
-        createTransaction(accessToken, year, "-20.00", "EUR");
-        createTransaction(accessToken, year, "300.00", "EUR");
+        // Create transaction(s) in EUR.
+        TransactionRequest transactionRequestEUR1 = new TransactionRequest(
+            year,
+            new BigDecimal("-10.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR1
+        );
 
-        createTransaction(accessToken, year, "-400.00", "USD");
+        TransactionRequest transactionRequestEUR2 = new TransactionRequest(
+            year,
+            new BigDecimal("-20.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR2
+        );
 
-        createTransaction(accessToken, year, "5000.00", "CHF");
-        createTransaction(accessToken, year, "6000.00", "CHF");
+        TransactionRequest transactionRequestEUR3 = new TransactionRequest(
+            year,
+            new BigDecimal("300.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR3
+        );
+
+        // Create transaction(s) in USD.
+        TransactionRequest transactionRequestUSD1 = new TransactionRequest(
+            year,
+            new BigDecimal("-400.00"),
+            "USD",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestUSD1
+        );
+
+        // Create transaction(s) in CHF.
+        TransactionRequest transactionRequestCHF1 = new TransactionRequest(
+            year,
+            new BigDecimal("5000.00"),
+            "CHF",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestCHF1
+        );
+
+        TransactionRequest transactionRequestCHF2 = new TransactionRequest(
+            year,
+            new BigDecimal("6000.00"),
+            "CHF",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestCHF2
+        );
 
         // Act.
-        TotalsResponse observed = restTestClient
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/totals?year=" + year)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
-            .expectBody(TotalsResponse.class)
-            .returnResult()
-            .getResponseBody();
+        ;
 
         // Assert.
+        TotalsResponse observed = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody(TotalsResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
         // `BigDecimal.equals` compares the scale too,
         // so this also checks for 2 decimal places.
         Map<String, BigDecimal> expectedExpenses = Map.of(
@@ -236,7 +336,7 @@ class TotalsControllerTests {
             expectedExpenses,
             expectedIncomes
         );
-        assertEquals(expected, observed);
+        Assertions.assertEquals(expected, observed);
     }
 
     /**
@@ -247,34 +347,92 @@ class TotalsControllerTests {
     @Test
     void computeTotals_05() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
 
         int year = 2026;
 
-        createTransaction(accessToken, year, "100.00", "EUR");
-        createTransaction(accessToken, year, "-20.00", "EUR");
+        // Create transaction(s) in EUR.
+        TransactionRequest transactionRequestEUR1 = new TransactionRequest(
+            year,
+            new BigDecimal("100.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR1
+        );
 
-        createTransaction(accessToken, year, "0.00", "JPY");
+        TransactionRequest transactionRequestEUR2 = new TransactionRequest(
+            year,
+            new BigDecimal("-20.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR2
+        );
 
-        createTransaction(accessToken, year + 1, "-70000.00", "EUR");
+        // Create transaction(s) in JPY.
+        TransactionRequest transactionRequestJPY1 = new TransactionRequest(
+            year,
+            new BigDecimal("0.00"),
+            "JPY",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestJPY1
+        );
+
+        // Create transaction(s) in EUR.
+        TransactionRequest transactionRequestEUR3 = new TransactionRequest(
+            year + 1,
+            new BigDecimal("-70000.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR3
+        );
 
         // Act.
-        TotalsResponse observed = restTestClient
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/totals?year=" + year)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
-            .expectBody(TotalsResponse.class)
-            .returnResult()
-            .getResponseBody();
+        ;
 
         // Assert.
+        TotalsResponse observed = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody(TotalsResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
         Map<String, BigDecimal> expectedExpenses = Map.of(
             "EUR", new BigDecimal("-20.00")
         );
@@ -286,48 +444,73 @@ class TotalsControllerTests {
             expectedExpenses,
             expectedIncomes
         );
-        assertEquals(expected, observed);
+        Assertions.assertEquals(expected, observed);
     }
 
     /**
      * This exercises a "happy but atypical" success path.
-     * 
+     *
      * Covers a year without any {@link Transaction}s,
      * which requires no {@code ExchangeRate}s at all.
      */
     @Test
     void computeTotals_06() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         int year = 2030;
         String currencyToReportTotalsIn = "EUR";
 
-        createTransaction(accessToken, year - 1, "-10.00", "USD");
+        // Create transaction(s) in USD.
+        TransactionRequest transactionRequestUSD1 = new TransactionRequest(
+            year - 1,
+            new BigDecimal("-10.00"),
+            "USD",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestUSD1
+        );
 
         // Act.
-        TotalsResponse observed = restTestClient
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
-            .expectBody(TotalsResponse.class)
-            .returnResult()
-            .getResponseBody();
+        ;
 
         // Assert.
+        TotalsResponse observed = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody(TotalsResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
         TotalsResponse expected = new TotalsResponse(
             year,
             Map.of(),
             Map.of()
         );
-        assertEquals(expected, observed);
+        Assertions.assertEquals(expected, observed);
     }
 
     /**
@@ -342,249 +525,465 @@ class TotalsControllerTests {
     @Test
     void computeTotals_07() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
+        String inadmissibleCurrency = "";
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/totals?year=2026&currency=" + inadmissibleCurrency)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "currency": "must match \\"^[A-Z]{3}$\\""
                 }
             }
-        """;
+            """
+        ;
 
-        restTestClient
-            .get().uri("/api/v1/totals?year=2026&currency=")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .exchange()
-            .expectStatus().isBadRequest()
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
      * This exercises an unhappy path.
-     * 
+     *
      * Covers a {@code currency} which does not match the expected {@code @Pattern}.
-     * 
+     *
      * Expects a 400 with the same body shape as the existing validation errors.
      */
     @Test
     void computeTotals_08() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
 
-        String currencyToReportTotalsIn = "eur";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        String inadmissibleCurrency = "eur";
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/totals?year=2026&currency=" + inadmissibleCurrency)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "currency": "must match \\"^[A-Z]{3}$\\""
                 }
             }
-        """;
+            """
+        ;
 
-        restTestClient
-            .get().uri("/api/v1/totals?year=2026&currency=" + currencyToReportTotalsIn)
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .exchange()
-            .expectStatus().isBadRequest()
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
      * This exercises an unhappy path.
-     * 
+     *
      * Covers 2 missing {@code ExchangeRate}s (CHF -> EUR, USD -> EUR),
      * while the database holds rates which must not be used instead:
      * an inverse rate (EUR -> USD),
      * a rate for another year (CHF -> EUR),
      * and rates which would allow chaining (USD -> GBP -> EUR).
-     * 
+     *
      * Expects every missing rate to be reported,
      * ordered by {@code sourceCurrency}.
      */
     @Test
     void computeTotals_09() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         int year = 2026;
         String currencyToReportTotalsIn = "EUR";
 
-        createTransaction(accessToken, year, "-10.00", currencyToReportTotalsIn);
-        createTransaction(accessToken, year, "-20.00", "USD");
-        createTransaction(accessToken, year, "30.00", "CHF");
-
-        createExchangeRate(
+        // Create transaction(s) in EUR.
+        TransactionRequest transactionRequestEUR1 = new TransactionRequest(
+            year,
+            new BigDecimal("-10.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
             accessToken,
+            transactionRequestEUR1
+        );
+
+        // Create transaction(s) in USD.
+        TransactionRequest transactionRequestUSD1 = new TransactionRequest(
+            year,
+            new BigDecimal("-20.00"),
+            "USD",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestUSD1
+        );
+
+        // Create transaction(s) in CHF.
+        TransactionRequest transactionRequestCHF1 = new TransactionRequest(
+            year,
+            new BigDecimal("30.00"),
+            "CHF",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestCHF1
+        );
+
+        // Create exchange rates.
+        ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
             year,
             currencyToReportTotalsIn,
             "USD",
-            "1.1"
+            new BigDecimal("1.1")
+        );
+        Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate1
         );
 
-        createExchangeRate(
-            accessToken,
+        ExchangeRateRequestCreate exchangeRateRequestCreate2 = new ExchangeRateRequestCreate(
             year - 1,
             "CHF",
             currencyToReportTotalsIn,
-            "1.05"
+            new BigDecimal("1.05")
+        );
+        Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate2
         );
 
-        createExchangeRate(
-            accessToken,
+        ExchangeRateRequestCreate exchangeRateRequestCreate3 = new ExchangeRateRequestCreate(
             year,
             "USD",
             "GBP",
-            "0.75"
+            new BigDecimal("0.75")
         );
-        createExchangeRate(
+        Utilities.createExchangeRate(
+            restTestClient,
             accessToken,
+            exchangeRateRequestCreate3
+        );
+
+        ExchangeRateRequestCreate exchangeRateRequestCreate4 = new ExchangeRateRequestCreate(
             year,
             "GBP",
             currencyToReportTotalsIn,
-            "1.15"
+            new BigDecimal("1.15")
+        );
+        Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate4
         );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
-            {
-                "error": "Missing exchange rates",
-                "missingExchangeRates": [
-                    { "year": 2026, "sourceCurrency": "CHF", "targetCurrency": "EUR" },
-                    { "year": 2026, "sourceCurrency": "USD", "targetCurrency": "EUR" }
-                ]
-            }
-        """;
-
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
+            {
+                "error": "Missing exchange rates",
+                "missingExchangeRates": [
+                    {
+                        "year": 2026,
+                        "sourceCurrency": "CHF",
+                        "targetCurrency": "EUR"
+                    },
+                    {
+                        "year": 2026,
+                        "sourceCurrency": "USD",
+                        "targetCurrency": "EUR"
+                    }
+                ]
+            }
+            """
+        ;
+
+        responseSpec
             .expectStatus().isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
      * This exercises a happy path.
-     * 
+     *
      * Covers totals which are all in the chosen currency (EUR) and are all incomes,
      * which requires no {@code ExchangeRate}s and yields {@code {}} for the expenses.
      */
     @Test
     void computeTotals_10() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         int year = 2026;
         String currencyToReportTotalsIn = "EUR";
 
-        createTransaction(accessToken, year, "100.00", currencyToReportTotalsIn);
-        createTransaction(accessToken, year, "200.50", currencyToReportTotalsIn);
+        // Create transaction(s) in EUR.
+        TransactionRequest transactionRequestEUR1 = new TransactionRequest(
+            year,
+            new BigDecimal("100.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR1
+        );
+
+        TransactionRequest transactionRequestEUR2 = new TransactionRequest(
+            year,
+            new BigDecimal("200.50"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR2
+        );
 
         // Act.
-        TotalsResponse observed = restTestClient
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
-            .expectBody(TotalsResponse.class)
-            .returnResult()
-            .getResponseBody();
+        ;
 
         // Assert.
+        TotalsResponse observed = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody(TotalsResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
         TotalsResponse expected = new TotalsResponse(
             year,
             Map.of(),
-            Map.of(currencyToReportTotalsIn, new BigDecimal("300.50"))
+            Map.of(
+                currencyToReportTotalsIn, new BigDecimal("300.50")
+            )
         );
-        assertEquals(expected, observed);
+        Assertions.assertEquals(expected, observed);
     }
 
     /**
      * This exercises a happy path.
-     * 
+     *
      * Covers a chosen currency (GBP) which none of the year's {@link Transaction}s are in.
      * Expects every total to be converted into it.
      */
     @Test
     void computeTotals_11() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         int year = 2026;
         String currencyToReportTotalsIn = "GBP";
 
-        createTransaction(accessToken, year, "-40.00", "EUR");
-        createTransaction(accessToken, year, "80.00", "USD");
+        // Create transaction(s) in EUR.
+        TransactionRequest transactionRequestEUR1 = new TransactionRequest(
+            year,
+            new BigDecimal("-40.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR1
+        );
 
-        createExchangeRate(accessToken, year, "EUR", currencyToReportTotalsIn, "0.85");
-        createExchangeRate(accessToken, year, "USD", currencyToReportTotalsIn, "0.75");
+        // Create transaction(s) in USD.
+        TransactionRequest transactionRequestUSD1 = new TransactionRequest(
+            year,
+            new BigDecimal("80.00"),
+            "USD",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestUSD1
+        );
+
+        // Create exchange rates.
+        ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
+            year,
+            "EUR",
+            currencyToReportTotalsIn,
+            new BigDecimal("0.85")
+        );
+        Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate1
+        );
+
+        ExchangeRateRequestCreate exchangeRateRequestCreate2 = new ExchangeRateRequestCreate(
+            year,
+            "USD",
+            currencyToReportTotalsIn,
+            new BigDecimal("0.75")
+        );
+        Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate2
+        );
 
         // Act.
-        TotalsResponse observed = restTestClient
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
-            .expectBody(TotalsResponse.class)
-            .returnResult()
-            .getResponseBody();
+        ;
 
         // Assert.
+        TotalsResponse observed = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody(TotalsResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
         TotalsResponse expected = new TotalsResponse(
             year,
-            Map.of(currencyToReportTotalsIn, new BigDecimal("-34.00")),
-            Map.of(currencyToReportTotalsIn, new BigDecimal("60.00"))
+            Map.of(
+                currencyToReportTotalsIn, new BigDecimal("-34.00")
+            ),
+            Map.of(
+                currencyToReportTotalsIn, new BigDecimal("60.00")
+            )
         );
-        assertEquals(expected, observed);
+
+        Assertions.assertEquals(expected, observed);
     }
 
     /**
      * This exercises a happy path.
-     * 
+     *
      * Covers converting totals from several currencies (USD, CHF) into the chosen one (EUR),
      * alongside a total already in the chosen currency (EUR).
      * The amounts are picked so that
@@ -594,41 +993,133 @@ class TotalsControllerTests {
     @Test
     void computeTotals_12() {
         // Arrange.
-        String accessToken = obtainAccessToken(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         int year = 2026;
         String currencyToReportTotalsIn = "EUR";
 
-        createTransaction(accessToken, year, "-10.00", currencyToReportTotalsIn);
-        createTransaction(accessToken, year, "-100.01", "USD");
-        createTransaction(accessToken, year, "-100.01", "CHF");
+        // Create transaction(s) in EUR.
+        TransactionRequest transactionRequestEUR1 = new TransactionRequest(
+            year,
+            new BigDecimal("-10.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR1
+        );
 
-        createTransaction(accessToken, year, "100.00", currencyToReportTotalsIn);
-        createTransaction(accessToken, year, "100.01", "USD");
+        TransactionRequest transactionRequestEUR2 = new TransactionRequest(
+            year,
+            new BigDecimal("100.00"),
+            "EUR",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestEUR2
+        );
 
-        createExchangeRate(accessToken, year, "USD", currencyToReportTotalsIn, "0.5");
-        createExchangeRate(accessToken, year, "CHF", currencyToReportTotalsIn, "0.5");
+        // Create transaction(s) in USD.
+        TransactionRequest transactionRequestUSD1 = new TransactionRequest(
+            year,
+            new BigDecimal("-100.01"),
+            "USD",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestUSD1
+        );
+
+        TransactionRequest transactionRequestUSD2 = new TransactionRequest(
+            year,
+            new BigDecimal("100.01"),
+            "USD",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestUSD2
+        );
+
+        // Create transaction(s) in CHF.
+        TransactionRequest transactionRequestCHF1 = new TransactionRequest(
+            year,
+            new BigDecimal("-100.01"),
+            "CHF",
+            "description"
+        );
+        Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequestCHF1
+        );
+
+        // Create exchange rates.
+        ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
+            year,
+            "USD",
+            currencyToReportTotalsIn,
+            new BigDecimal("0.5")
+        );
+        Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate1
+        );
+
+        ExchangeRateRequestCreate exchangeRateRequestCreate2 = new ExchangeRateRequestCreate(
+            year,
+            "CHF",
+            currencyToReportTotalsIn,
+            new BigDecimal("0.5")
+        );
+        Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate2
+        );
 
         // Act.
-        TotalsResponse observed = restTestClient
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/totals?year=" + year + "&currency=" + currencyToReportTotalsIn)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
-            .expectBody(TotalsResponse.class)
-            .returnResult()
-            .getResponseBody();
+        ;
 
         // Assert.
         // expenses: -10.00 + (-50.005) + (-50.005) = -110.01
         // (rounding before summing would give -110.02)
         // incomes: 100.00 + 50.005 = 150.005, which `HALF_UP` rounds to 150.01
+        TotalsResponse observed = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody(TotalsResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
         Map<String, BigDecimal> expectedExpenses = Map.of(
             currencyToReportTotalsIn, new BigDecimal("-110.01")
         );
@@ -640,54 +1131,7 @@ class TotalsControllerTests {
             expectedExpenses,
             expectedIncomes
         );
-        assertEquals(expected, observed);
-    }
 
-    private void createTransaction(
-        String accessToken,
-        int year,
-        String amount,
-        String currency
-        // String description
-    ) {
-        TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            new BigDecimal(amount),
-            currency,
-            "description"
-        );
-
-        restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(transactionRequest)
-            .exchange()
-            .expectStatus().isCreated();
-    }
-
-    private void createExchangeRate(
-        String accessToken,
-        int year,
-        String sourceCurrency,
-        String targetCurrency,
-        String sourceToTargetFactor
-    ) {
-        ExchangeRateRequestCreate exchangeRateRequest = new ExchangeRateRequestCreate(
-            year,
-            sourceCurrency,
-            targetCurrency,
-            new BigDecimal(sourceToTargetFactor)
-        );
-
-        restTestClient
-            .post().uri("/api/v1/exchange-rates")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(exchangeRateRequest)
-            .exchange()
-            .expectStatus().isCreated();
+        Assertions.assertEquals(expected, observed);
     }
 }

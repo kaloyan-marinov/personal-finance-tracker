@@ -7,10 +7,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kaloyan_marinov.personal_finance_tracker.Utilities;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
+import com.kaloyan_marinov.personal_finance_tracker.user.UserResponseCreate;
 
 @SpringBootTest(
     properties = {
@@ -29,7 +32,7 @@ and then the `RestTestClient` binds to the created `MockMvc` bean.
 @AutoConfigureMockMvc
 @Transactional
 class FaultyUseOfAuthenticationSchemesTests {
-    
+
     @Autowired
     private RestTestClient restTestClient;
 
@@ -58,7 +61,7 @@ class FaultyUseOfAuthenticationSchemesTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
             .expectHeader().valueEquals(
                 "WWW-Authenticate",
                 "Bearer resource_metadata=\"http://localhost/.well-known/oauth-protected-resource\""
@@ -79,12 +82,10 @@ class FaultyUseOfAuthenticationSchemesTests {
             "john.doe@protonmail.com",
             "123"
         );
-        restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-        ;
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
@@ -100,7 +101,7 @@ class FaultyUseOfAuthenticationSchemesTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
             .expectHeader().valueEquals(
                 "WWW-Authenticate",
                 "Bearer resource_metadata=\"http://localhost/.well-known/oauth-protected-resource\""
@@ -122,7 +123,7 @@ class FaultyUseOfAuthenticationSchemesTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
             .expectHeader().valueEquals(
                 "WWW-Authenticate",
                 "Bearer resource_metadata=\"http://localhost/.well-known/oauth-protected-resource\""
@@ -134,24 +135,20 @@ class FaultyUseOfAuthenticationSchemesTests {
      * A `GET` is a safe method, so CSRF protection never checks it.
      * If someone turned CSRF protection (for this project's application) back on,
      * the preceding test case would still pass.
-     * 
+     *
      * To close that gap,
      * the following test case issues a `POST` without credentials.
      */
     @Test
     void create_1() {
         // Arrange.
-        int year = 2008;
-        BigDecimal amount = new BigDecimal("-800.00");
-        String currency = "CHF";
-        String description = "groceries";
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            2008,
+            new BigDecimal("-800.00"),
+            "CHF",
+            "groceries"
         );
-        
+
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/transactions")
@@ -161,7 +158,7 @@ class FaultyUseOfAuthenticationSchemesTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
             .expectHeader().valueEquals(
                 "WWW-Authenticate",
                 "Bearer resource_metadata=\"http://localhost/.well-known/oauth-protected-resource\""
@@ -189,7 +186,7 @@ class FaultyUseOfAuthenticationSchemesTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
             .expectHeader().valueEquals(
                 "WWW-Authenticate",
                 "Bearer resource_metadata=\"http://localhost/.well-known/oauth-protected-resource\""

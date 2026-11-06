@@ -1,6 +1,6 @@
 package com.kaloyan_marinov.personal_finance_tracker.exchange_rate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.Assertions;
 
 import java.math.BigDecimal;
 
@@ -14,7 +14,7 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
+import com.kaloyan_marinov.personal_finance_tracker.Utilities;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserResponseCreate;
 
@@ -39,68 +39,6 @@ class ExchangeRateControllerMultiUserTests {
     @Autowired
     private RestTestClient restTestClient;
 
-    private UserResponseCreate createUser(
-        String username,
-        String email,
-        String password
-    ) {
-        UserRequestCreate userRequestCreate = new UserRequestCreate(
-            username,
-            email,
-            password
-        );
-        UserResponseCreate userResponseCreate = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return userResponseCreate;
-    }
-
-    private String obtainAccessToken(
-        String email,
-        String password
-    ) {
-        TokenResponse tokenResponse = restTestClient
-            .post().uri("/api/v1/tokens")
-            .headers(
-                h -> h.setBasicAuth(
-                    email,
-                    password
-                )
-            )
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody(TokenResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return tokenResponse.accessToken();
-    }
-
-    private ExchangeRateResponse createExchangeRate(
-        String accessToken,
-        ExchangeRateRequestCreate exchangeRateRequestCreate
-    ) {
-        return restTestClient
-            .post().uri("/api/v1/exchange-rates")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(exchangeRateRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(ExchangeRateResponse.class)
-            .returnResult()
-            .getResponseBody();
-    }
-
     /**
      * Distinct users should be able to create their own exchange rate
      * for the same year and currency pair.
@@ -108,82 +46,107 @@ class ExchangeRateControllerMultiUserTests {
     @Test
     void create_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
         );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
-
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
         );
 
-        int year = 2003;
-        String sourceCurrency = "ABC";
-        String targetCurrency = "XYZ";
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
+        );
 
         ExchangeRateRequestCreate erRequestCreate = new ExchangeRateRequestCreate(
-            year,
-            sourceCurrency,
-            targetCurrency,
+            2003,
+            "ABC",
+            "XYZ",
             new BigDecimal("1.234")
         );
 
-        // Act.
-        createExchangeRate(
-            accessTokenForUser1,
+        Utilities.createExchangeRate(
+            restTestClient,
+            jdAccessToken,
             erRequestCreate
         );
 
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(msAccessToken)
+            )
+            .body(erRequestCreate)
+            .exchange()
+        ;
+
         // Assert.
-        createExchangeRate(
-            accessTokenForUser2,
-            erRequestCreate
-        );
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
+        ;
     }
 
     /**
      * Given two distinct users (User 1 and User 2),
      * User 2 should not be able to retrieve
-     * any exhchange rate that refers to (= is owned by) User 1.
+     * any exchange rate that refers to (= is owned by) User 1.
      */
     @Test
     void retrieveOne_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
         );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
-
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
         );
-        
+
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
+        );
+
         ExchangeRateRequestCreate erRequest = new ExchangeRateRequestCreate(
             2003,
             "EUR",
@@ -191,24 +154,17 @@ class ExchangeRateControllerMultiUserTests {
             new BigDecimal("1.085")
         );
 
-        ExchangeRateResponse erResponse = restTestClient
-            .post().uri("/api/v1/exchange-rates")
-            .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
-            )
-            .body(erRequest)
-            .exchange()
-            .expectStatus().isEqualTo(HttpStatus.CREATED)
-            .expectBody(ExchangeRateResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
+        ExchangeRateResponse erResponse = Utilities.createExchangeRate(
+            restTestClient,
+            jdAccessToken,
+            erRequest
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/exchange-rates/" + erResponse.year() + "/" + erResponse.sourceCurrency() + "/" + erResponse.targetCurrency())
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser2)
+                h -> h.setBearerAuth(msAccessToken)
             )
             .exchange()
         ;
@@ -221,43 +177,63 @@ class ExchangeRateControllerMultiUserTests {
     }
 
     /**
-     * 
+     * Given two distinct users (User 1 and User 2),
+     * each of whom owns an exchange rate
+     * for the same year and currency pair (but with different factors).
+     *
+     * When User 1 retrieves the exchange rate for that year and currency pair,
+     * the response should contain User 1's exchange rate (and not User 2's).
      */
     @Test
     void retrieveOne_2() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
         );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
-
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
         );
-        
+
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
+        );
+
         Integer year = 2003;
         String sourceCurrency = "EUR";
         String targetCurrency = "USD";
+
         ExchangeRateRequestCreate erRequest1 = new ExchangeRateRequestCreate(
             year,
             sourceCurrency,
             targetCurrency,
             new BigDecimal("1.100")
         );
-        ExchangeRateResponse erResponse1 = createExchangeRate(accessTokenForUser1, erRequest1);
+        ExchangeRateResponse erResponse1 = Utilities.createExchangeRate(
+            restTestClient,
+            jdAccessToken,
+            erRequest1
+        );
 
         ExchangeRateRequestCreate erRequest2 = new ExchangeRateRequestCreate(
             year,
@@ -265,13 +241,17 @@ class ExchangeRateControllerMultiUserTests {
             targetCurrency,
             new BigDecimal("1.200")
         );
-        ExchangeRateResponse erReponse2 = createExchangeRate(accessTokenForUser2, erRequest2);
+        ExchangeRateResponse erResponse2 = Utilities.createExchangeRate(
+            restTestClient,
+            msAccessToken,
+            erRequest2
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/exchange-rates/" + year + "/" + sourceCurrency + "/" + targetCurrency)
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
+                h -> h.setBearerAuth(jdAccessToken)
             )
             .exchange()
         ;
@@ -291,13 +271,13 @@ class ExchangeRateControllerMultiUserTests {
             targetCurrency,
             erRequest1.sourceToTargetFactor()
         );
-        assertEquals(expected, observed);
+        Assertions.assertEquals(expected, observed);
     }
 
     /**
      * Given two distinct users (User 1 and User 2),
      * each of whom has/owns >=1 exchange rate.
-     * 
+     *
      * When User 2 issues `GET /api/v1/exchange-rates`,
      * the response body should:
      * (a) consist of the exchange rates owned by User 2;
@@ -306,26 +286,36 @@ class ExchangeRateControllerMultiUserTests {
     @Test
     void retrieveAll_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
-            "test-" + "john.doe@protonail.com",
+            "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonail.com",
-            "test-" + "123"
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
         );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
+        );
 
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
@@ -334,8 +324,9 @@ class ExchangeRateControllerMultiUserTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRateResponse exchangeRateResponse1 = createExchangeRate(
-            accessTokenForUser1,
+        ExchangeRateResponse exchangeRateResponse1 = Utilities.createExchangeRate(
+            restTestClient,
+            jdAccessToken,
             exchangeRateRequestCreate1
         );
 
@@ -345,8 +336,9 @@ class ExchangeRateControllerMultiUserTests {
             "EUR",
             new BigDecimal("1.06")
         );
-        ExchangeRateResponse exchangeRateResponse2 = createExchangeRate(
-            accessTokenForUser2,
+        ExchangeRateResponse exchangeRateResponse2 = Utilities.createExchangeRate(
+            restTestClient,
+            msAccessToken,
             exchangeRateRequestCreate2
         );
 
@@ -354,7 +346,7 @@ class ExchangeRateControllerMultiUserTests {
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/exchange-rates")
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser2)
+                h -> h.setBearerAuth(msAccessToken)
             )
             .exchange()
         ;
@@ -370,8 +362,10 @@ class ExchangeRateControllerMultiUserTests {
                     targetCurrency: "EUR",
                     sourceToTargetFactor: 1.06
                 }
-            ]            
-            """.formatted(exchangeRateResponse2.id())
+            ]
+            """.formatted(
+                exchangeRateResponse2.id()
+            )
         ;
         responseSpec
             .expectStatus().isEqualTo(HttpStatus.OK)
@@ -389,26 +383,36 @@ class ExchangeRateControllerMultiUserTests {
     @Test
     void update_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
         );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
+        );
 
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -417,8 +421,9 @@ class ExchangeRateControllerMultiUserTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRateResponse exchangeRateResponse = createExchangeRate(
-            accessTokenForUser1,
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
+            jdAccessToken,
             exchangeRateRequestCreate
         );
 
@@ -430,7 +435,7 @@ class ExchangeRateControllerMultiUserTests {
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .put().uri("/api/v1/exchange-rates/" + exchangeRateResponse.year() + "/" + exchangeRateResponse.sourceCurrency() + "/" + exchangeRateResponse.targetCurrency())
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser2)
+                h -> h.setBearerAuth(msAccessToken)
             )
             .body(updateRequest)
             .exchange()
@@ -451,13 +456,15 @@ class ExchangeRateControllerMultiUserTests {
                 targetCurrency: "USD",
                 sourceToTargetFactor: 1.085
             }
-            """.formatted(exchangeRateResponse.id())
+            """.formatted(
+                exchangeRateResponse.id()
+            )
         ;
         restTestClient
             .get().uri("/api/v1/exchange-rates/" + exchangeRateResponse.year() + "/" + exchangeRateResponse.sourceCurrency() + "/" + exchangeRateResponse.targetCurrency())
             .header(
                 "Authorization",
-                "Bearer " + accessTokenForUser1
+                "Bearer " + jdAccessToken
             )
             .exchange()
             .expectStatus().isEqualTo(HttpStatus.OK)
@@ -467,45 +474,65 @@ class ExchangeRateControllerMultiUserTests {
             )
         ;
     }
-    
+
     /**
-     * 
+     * Given two distinct users (User 1 and User 2),
+     * each of whom owns an exchange rate
+     * for the same year and currency pair (but with different factors).
+     *
+     * When User 1 updates the exchange rate for that year and currency pair,
+     * the update should be applied to User 1's exchange rate (and not to User 2's).
      */
     @Test
     void update_2() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
         );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
-
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
         );
-        
+
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
+        );
+
         Integer year = 2003;
         String sourceCurrency = "EUR";
         String targetCurrency = "USD";
+
         ExchangeRateRequestCreate erRequest1 = new ExchangeRateRequestCreate(
             year,
             sourceCurrency,
             targetCurrency,
             new BigDecimal("1.100")
         );
-        ExchangeRateResponse erResponse1 = createExchangeRate(accessTokenForUser1, erRequest1);
+        ExchangeRateResponse erResponse1 = Utilities.createExchangeRate(
+            restTestClient,
+            jdAccessToken,
+            erRequest1
+        );
 
         ExchangeRateRequestCreate erRequest2 = new ExchangeRateRequestCreate(
             year,
@@ -513,7 +540,11 @@ class ExchangeRateControllerMultiUserTests {
             targetCurrency,
             new BigDecimal("1.200")
         );
-        ExchangeRateResponse erResponse2 = createExchangeRate(accessTokenForUser2, erRequest2);
+        ExchangeRateResponse erResponse2 = Utilities.createExchangeRate(
+            restTestClient,
+            msAccessToken,
+            erRequest2
+        );
 
         ExchangeRateRequestUpdate erRequestUpdate = new ExchangeRateRequestUpdate(
             new BigDecimal("2.100")
@@ -523,28 +554,49 @@ class ExchangeRateControllerMultiUserTests {
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .put().uri("/api/v1/exchange-rates/" + year + "/" + sourceCurrency + "/" + targetCurrency)
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
+                h -> h.setBearerAuth(jdAccessToken)
             )
             .body(erRequestUpdate)
             .exchange()
         ;
 
         // Assert.
-        ExchangeRateResponse observed = responseSpec
+        ExchangeRateResponse jdObserved = responseSpec
             .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody(ExchangeRateResponse.class)
             .returnResult()
             .getResponseBody()
         ;
 
-        ExchangeRateResponse expected = new ExchangeRateResponse(
+        ExchangeRateResponse jdExpected = new ExchangeRateResponse(
             erResponse1.id(),
             year,
             sourceCurrency,
             targetCurrency,
             erRequestUpdate.sourceToTargetFactor()
         );
-        assertEquals(expected, observed);
+        Assertions.assertEquals(jdExpected, jdObserved);
+
+        ExchangeRateResponse msObserved = restTestClient
+            .get().uri("/api/v1/exchange-rates/" + year + "/" + sourceCurrency + "/" + targetCurrency)
+            .headers(
+                h -> h.setBearerAuth(msAccessToken)
+            )
+            .exchange()
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody(ExchangeRateResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
+        ExchangeRateResponse msExpected = new ExchangeRateResponse(
+            erResponse2.id(),
+            year,
+            sourceCurrency,
+            targetCurrency,
+            erRequest2.sourceToTargetFactor()
+        );
+        Assertions.assertEquals(msExpected, msObserved);
     }
 
     /**
@@ -555,26 +607,36 @@ class ExchangeRateControllerMultiUserTests {
     @Test
     void delete_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
         );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
+        );
 
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -583,13 +645,17 @@ class ExchangeRateControllerMultiUserTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRateResponse exchangeRateResponse = createExchangeRate(accessTokenForUser1, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
+            jdAccessToken,
+            exchangeRateRequestCreate
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .delete().uri("/api/v1/exchange-rates/" + exchangeRateResponse.year() + "/" + exchangeRateResponse.sourceCurrency() + "/" + exchangeRateResponse.targetCurrency())
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser2)
+                h -> h.setBearerAuth(msAccessToken)
             )
             .exchange()
         ;
@@ -609,12 +675,14 @@ class ExchangeRateControllerMultiUserTests {
                 "targetCurrency": "USD",
                 "sourceToTargetFactor": 1.085
             }
-            """.formatted(exchangeRateResponse.id())
+            """.formatted(
+                exchangeRateResponse.id()
+            )
         ;
         restTestClient
             .get().uri("/api/v1/exchange-rates/" + exchangeRateResponse.year() + "/" + exchangeRateResponse.sourceCurrency() + "/" + exchangeRateResponse.targetCurrency())
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
+                h -> h.setBearerAuth(jdAccessToken)
             )
             .exchange()
             .expectStatus().isEqualTo(HttpStatus.OK)
@@ -624,45 +692,66 @@ class ExchangeRateControllerMultiUserTests {
             )
         ;
     }
-    
+
     /**
-     * 
+     * Given two distinct users (User 1 and User 2),
+     * each of whom owns an exchange rate
+     * for the same year and currency pair (but with different factors).
+     *
+     * User 1 should be able to delete their own exchange rate
+     * for that year and currency pair,
+     * even though User 2 owns an exchange rate for the same year and currency pair.
      */
     @Test
     void delete_2() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
         );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
-
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
         );
-        
+
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
+        );
+
         Integer year = 2003;
         String sourceCurrency = "EUR";
         String targetCurrency = "USD";
+
         ExchangeRateRequestCreate erRequest1 = new ExchangeRateRequestCreate(
             year,
             sourceCurrency,
             targetCurrency,
             new BigDecimal("1.100")
         );
-        ExchangeRateResponse erResponse1 = createExchangeRate(accessTokenForUser1, erRequest1);
+        ExchangeRateResponse erResponse1 = Utilities.createExchangeRate(
+            restTestClient,
+            jdAccessToken,
+            erRequest1
+        );
 
         ExchangeRateRequestCreate erRequest2 = new ExchangeRateRequestCreate(
             year,
@@ -670,13 +759,17 @@ class ExchangeRateControllerMultiUserTests {
             targetCurrency,
             new BigDecimal("1.200")
         );
-        ExchangeRateResponse erResponse2 = createExchangeRate(accessTokenForUser2, erRequest2);
+        ExchangeRateResponse erResponse2 = Utilities.createExchangeRate(
+            restTestClient,
+            msAccessToken,
+            erRequest2
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .delete().uri("/api/v1/exchange-rates/" + year + "/" + sourceCurrency + "/" + targetCurrency)
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
+                h -> h.setBearerAuth(jdAccessToken)
             )
             .exchange()
         ;
@@ -685,6 +778,33 @@ class ExchangeRateControllerMultiUserTests {
         responseSpec
             .expectStatus().isEqualTo(HttpStatus.NO_CONTENT)
             .expectBody().isEmpty()
+        ;
+
+        String expectedBodyJSON = 
+            """
+            {
+                "id": %d,
+                "year": 2003,
+                "sourceCurrency": "EUR",
+                "targetCurrency": "USD",
+                "sourceToTargetFactor": 1.200
+            }    
+            """.formatted(
+                erResponse2.id()
+            )
+        ;
+
+        restTestClient
+            .get().uri("/api/v1/exchange-rates/" + year + "/" + sourceCurrency + "/" + targetCurrency)
+            .headers(
+                h -> h.setBearerAuth(msAccessToken)
+            )
+            .exchange()
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody().json(
+                expectedBodyJSON,
+                JsonCompareMode.STRICT
+            )
         ;
     }
 }

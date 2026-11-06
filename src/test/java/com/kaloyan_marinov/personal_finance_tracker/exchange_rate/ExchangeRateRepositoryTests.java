@@ -1,7 +1,6 @@
 package com.kaloyan_marinov.personal_finance_tracker.exchange_rate;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Assertions;
 
 import java.math.BigDecimal;
 
@@ -49,34 +48,30 @@ class ExchangeRateRepositoryTests {
         );
         userRepository.save(user);
 
-        Integer year = 2001;
-        String sourceCurrency = "EUR";
-        String targetCurrency = "USD";
         ExchangeRate er = new ExchangeRate(
-            year,
-            sourceCurrency,
-            targetCurrency,
+            2001,
+            "EUR",
+            "USD",
             new BigDecimal("1.085")
         );
         er.setUser(user);
-
         exchangeRateRepository.saveAndFlush(er);
-        
-        // Act + Assert.
+
         ExchangeRate duplicate = new ExchangeRate(
-            year,
-            sourceCurrency,
-            targetCurrency,
+            er.getYear(),
+            er.getSourceCurrency(),
+            er.getTargetCurrency(),
             new BigDecimal("1.1")
         );
         duplicate.setUser(user);
 
-        DataIntegrityViolationException exc = assertThrows(
+        // Act + Assert.
+        DataIntegrityViolationException exc = Assertions.assertThrows(
             DataIntegrityViolationException.class,
             () -> exchangeRateRepository.saveAndFlush(duplicate)
         );
 
-        assertTrue(
+        Assertions.assertTrue(
             exc
             .getMessage().toUpperCase()
             .contains("UQ_EXCHANGE_RATES_USER_ID_YEAR_CURRENCIES")
@@ -106,12 +101,12 @@ class ExchangeRateRepositoryTests {
         exchangeRate.setUser(user);
 
         // Act + Assert.
-        DataIntegrityViolationException exc = assertThrows(
+        DataIntegrityViolationException exc = Assertions.assertThrows(
             DataIntegrityViolationException.class,
             () -> exchangeRateRepository.saveAndFlush(exchangeRate)
         );
 
-        assertTrue(
+        Assertions.assertTrue(
             exc
             .getMessage().toUpperCase()
             .contains("CHK_EXCHANGE_RATES_FACTOR_POSITIVE")
@@ -141,12 +136,12 @@ class ExchangeRateRepositoryTests {
         exchangeRate.setUser(user);
 
         // Act + Assert.
-        DataIntegrityViolationException exc = assertThrows(
+        DataIntegrityViolationException exc = Assertions.assertThrows(
             DataIntegrityViolationException.class,
             () -> exchangeRateRepository.saveAndFlush(exchangeRate)
         );
 
-        assertTrue(
+        Assertions.assertTrue(
             exc
             .getMessage().toUpperCase()
             .contains("CHK_EXCHANGE_RATES_DISTINCT_CURRENCIES")
@@ -187,12 +182,12 @@ class ExchangeRateRepositoryTests {
         );
 
         // Act + Assert.
-        ConstraintViolationException exc = assertThrows(
+        ConstraintViolationException exc = Assertions.assertThrows(
             ConstraintViolationException.class,
             () -> exchangeRateRepository.saveAndFlush(exchangeRate)
         );
 
-        assertTrue(
+        Assertions.assertTrue(
             exc
             .getMessage()//.toUpperCase()
             .contains("interpolatedMessage='must not be null', propertyPath=sourceCurrency")
@@ -216,12 +211,12 @@ class ExchangeRateRepositoryTests {
         );
 
         // Act + Assert.
-        ConstraintViolationException exc = assertThrows(
+        ConstraintViolationException exc = Assertions.assertThrows(
             ConstraintViolationException.class,
             () -> exchangeRateRepository.saveAndFlush(exchangeRate)
         );
 
-        assertTrue(
+        Assertions.assertTrue(
             exc
             .getMessage()//.toUpperCase()
             .contains("interpolatedMessage='must match \"^[A-Z]{3}$\"', propertyPath=sourceCurrency")
@@ -245,12 +240,12 @@ class ExchangeRateRepositoryTests {
         );
 
         // Act + Assert.
-        ConstraintViolationException exc = assertThrows(
+        ConstraintViolationException exc = Assertions.assertThrows(
             ConstraintViolationException.class,
             () -> exchangeRateRepository.saveAndFlush(exchangeRate)
         );
 
-        assertTrue(
+        Assertions.assertTrue(
             exc
             .getMessage()//.toUpperCase()
             .contains("interpolatedMessage='must match \"^[A-Z]{3}$\"', propertyPath=sourceCurrency")

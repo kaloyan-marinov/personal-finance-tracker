@@ -12,7 +12,7 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
+import com.kaloyan_marinov.personal_finance_tracker.Utilities;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserResponseCreate;
 
@@ -34,53 +34,8 @@ and then the `RestTestClient` binds to the created `MockMvc` bean.
 @Transactional
 public class TransactionControllerMultiUserTests {
 
-    @Autowired 
+    @Autowired
     private RestTestClient restTestClient;
-
-    private UserResponseCreate createUser(
-        String username,
-        String email,
-        String password
-    ) {
-        UserRequestCreate userRequestCreate = new UserRequestCreate(
-            username,
-            email,
-            password
-        );
-        UserResponseCreate userResponseCreate = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return userResponseCreate;
-    }
-
-    private String obtainAccessToken(
-        String email,
-        String password
-    ) {
-        TokenResponse tokenResponse = restTestClient
-            .post().uri("/api/v1/tokens")
-            .headers(
-                h -> h.setBasicAuth(
-                    email,
-                    password
-                )
-            )
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody(TokenResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return tokenResponse.accessToken();
-    }
 
     /**
      * Given two distinct users (User 1 and User 2),
@@ -90,26 +45,36 @@ public class TransactionControllerMultiUserTests {
     @Test
     void retrieveOne_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
+        );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
         );
 
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
         );
 
         TransactionRequest transactionRequest = new TransactionRequest(
@@ -118,25 +83,17 @@ public class TransactionControllerMultiUserTests {
             "EUR",
             "groceries"
         );
-
-        TransactionResponse transactionResponse = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
-            )
-            .body(transactionRequest)
-            .exchange()
-            .expectStatus().isEqualTo(HttpStatus.CREATED)
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
+        TransactionResponse transactionResponse = Utilities.createTransaction(
+            restTestClient,
+            jdAccessToken,
+            transactionRequest
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/transactions/" + transactionResponse.id())
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser2)
+                h -> h.setBearerAuth(msAccessToken)
             )
             .exchange()
         ;
@@ -151,7 +108,7 @@ public class TransactionControllerMultiUserTests {
     /**
      * Given two distinct users (User 1 and User 2),
      * each of whom has/owns >=1 transaction.
-     * 
+     *
      * When User 2 issues `GET /api/v1/transactions`,
      * the response body should:
      * (a) consists of the transactions owned by User 2;
@@ -160,26 +117,36 @@ public class TransactionControllerMultiUserTests {
     @Test
     void retrieveAll_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-        
-        UserResponseCreate userResponseCreate2 = createUser(
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
+        );
+
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
         );
 
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
         );
 
         TransactionRequest transactionRequest1 = new TransactionRequest(
@@ -188,18 +155,11 @@ public class TransactionControllerMultiUserTests {
             "EUR",
             "groceries"
         );
-        TransactionResponse transactionResponse1 = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
-            )
-            .body(transactionRequest1)
-            .exchange()
-            .expectStatus().isEqualTo(HttpStatus.CREATED)
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
+        TransactionResponse transactionResponse1 = Utilities.createTransaction(
+            restTestClient,
+            jdAccessToken,
+            transactionRequest1
+        );
 
         TransactionRequest transactionRequest2 = new TransactionRequest(
             2007,
@@ -207,30 +167,23 @@ public class TransactionControllerMultiUserTests {
             "EUR",
             "groceries"
         );
-        TransactionResponse transactionResponse2 = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessTokenForUser2)
-            )
-            .body(transactionRequest2)
-            .exchange()
-            .expectStatus().isEqualTo(HttpStatus.CREATED)
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
+        TransactionResponse transactionResponse2 = Utilities.createTransaction(
+            restTestClient,
+            msAccessToken,
+            transactionRequest2
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/transactions")
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser2)
+                h -> h.setBearerAuth(msAccessToken)
             )
             .exchange()
         ;
 
         // Assert.
-        String expectedBodyJSON = 
+        String expectedBodyJSON =
             """
             [
                 {
@@ -240,8 +193,10 @@ public class TransactionControllerMultiUserTests {
                     "currency": "EUR",
                     "description": "groceries"
                 }
-            ] 
-            """.formatted(transactionResponse2.id())
+            ]
+            """.formatted(
+                transactionResponse2.id()
+            )
         ;
         responseSpec
             .expectStatus().isEqualTo(HttpStatus.OK)
@@ -260,26 +215,36 @@ public class TransactionControllerMultiUserTests {
     @Test
     void update_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-        
-        UserResponseCreate userResponseCreate2 = createUser(
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
+        );
+
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
         );
 
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
         );
 
         TransactionRequest transactionRequest1 = new TransactionRequest(
@@ -288,18 +253,11 @@ public class TransactionControllerMultiUserTests {
             "EUR",
             "groceries"
         );
-        TransactionResponse transactionResponse1 = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
-            )
-            .body(transactionRequest1)
-            .exchange()
-            .expectStatus().isEqualTo(HttpStatus.CREATED)
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
+        TransactionResponse transactionResponse1 = Utilities.createTransaction(
+            restTestClient,
+            jdAccessToken,
+            transactionRequest1
+        );
 
         TransactionRequest transactionRequest2 = new TransactionRequest(
             transactionRequest1.year() + 10,
@@ -315,7 +273,7 @@ public class TransactionControllerMultiUserTests {
             .put().uri("/api/v1/transactions/" + transactionResponse1.id())
             .header(
                 "Authorization",
-                "Bearer " + accessTokenForUser2
+                "Bearer " + msAccessToken
             )
             .body(transactionRequest2)
             .exchange()
@@ -336,13 +294,15 @@ public class TransactionControllerMultiUserTests {
                 "currency": "EUR",
                 "description": "groceries"
             }
-            """.formatted(transactionResponse1.id())
+            """.formatted(
+                transactionResponse1.id()
+            )
         ;
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionResponse1.id())
             .header(
                 "Authorization",
-                "Bearer " + accessTokenForUser1
+                "Bearer " + jdAccessToken
             )
             .exchange()
             .expectStatus().isEqualTo(HttpStatus.OK)
@@ -361,26 +321,36 @@ public class TransactionControllerMultiUserTests {
     @Test
     void delete_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate1 = createUser(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
+        );
 
-        UserResponseCreate userResponseCreate2 = createUser(
+        String jdAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            jdUserRequestCreate.email(),
+            jdUserRequestCreate.password()
+        );
+
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "test-" + "ms",
             "test-" + "mary.smith@protonmail.com",
             "test-" + "456"
         );
-
-        String accessTokenForUser1 = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
         );
 
-        String accessTokenForUser2 = obtainAccessToken(
-            "test-" + "mary.smith@protonmail.com",
-            "test-" + "456"
+        String msAccessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            msUserRequestCreate.email(),
+            msUserRequestCreate.password()
         );
 
         TransactionRequest transactionRequest1 = new TransactionRequest(
@@ -389,24 +359,17 @@ public class TransactionControllerMultiUserTests {
             "EUR",
             "groceries"
         );
-        TransactionResponse transactionResponse1 = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
-            )
-            .body(transactionRequest1)
-            .exchange()
-            .expectStatus().isEqualTo(HttpStatus.CREATED)
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
+        TransactionResponse transactionResponse1 = Utilities.createTransaction(
+            restTestClient,
+            jdAccessToken,
+            transactionRequest1
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .delete().uri("/api/v1/transactions/" + transactionResponse1.id())
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser2)
+                h -> h.setBearerAuth(msAccessToken)
             )
             .exchange()
         ;
@@ -425,13 +388,15 @@ public class TransactionControllerMultiUserTests {
                 "amount": -600.00,
                 "currency": "EUR",
                 "description": "groceries"
-            }            
-            """.formatted(transactionResponse1.id())
+            }
+            """.formatted(
+                transactionResponse1.id()
+            )
         ;
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionResponse1.id())
             .headers(
-                h -> h.setBearerAuth(accessTokenForUser1)
+                h -> h.setBearerAuth(jdAccessToken)
             )
             .exchange()
             .expectStatus().isEqualTo(HttpStatus.OK)

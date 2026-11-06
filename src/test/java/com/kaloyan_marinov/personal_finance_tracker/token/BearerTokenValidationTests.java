@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
 /*
@@ -156,7 +157,7 @@ class BearerTokenValidationTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.OK)
         ;
     }
 
@@ -178,7 +179,7 @@ class BearerTokenValidationTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
         ;
     }
 
@@ -206,7 +207,7 @@ class BearerTokenValidationTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
         ;
     }
 
@@ -234,7 +235,7 @@ class BearerTokenValidationTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
         ;
     }
 
@@ -264,7 +265,7 @@ class BearerTokenValidationTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
         ;
     }
 
@@ -306,7 +307,7 @@ class BearerTokenValidationTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
         ;
     }
 

@@ -13,7 +13,7 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
+import com.kaloyan_marinov.personal_finance_tracker.Utilities;
 
 @SpringBootTest(
     properties = {
@@ -32,7 +32,7 @@ and then the `RestTestClient` binds to the created `MockMvc` bean.
 @AutoConfigureMockMvc
 @Transactional
 public class UserControllerTests {
-    
+
     @Autowired
     private RestTestClient restTestClient;
 
@@ -46,7 +46,7 @@ public class UserControllerTests {
         String username = "jd";
         String email = "john.doe@protonmail.com";
 
-        Map<String, String> body = Map.of(
+        Map<String, String> inadequateBody = Map.of(
             "username", username,
             "email", email
         );
@@ -54,22 +54,23 @@ public class UserControllerTests {
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/users")
-            .body(body)
+            .body(inadequateBody)
             .exchange()
         ;
 
         // Assert.
         responseSpec
-            .expectStatus().isBadRequest()
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
         ;
 
-        String expectedJSONString = """
+        String expectedJSONString =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "password": "must not be blank"
                 }
-            }    
+            }
             """
         ;
         responseSpec
@@ -90,7 +91,7 @@ public class UserControllerTests {
         String username = "jd";
         String password = "123";
 
-        Map<String, String> body = Map.of(
+        Map<String, String> inadequateBody = Map.of(
             "username", username,
             "password", password
         );
@@ -98,22 +99,23 @@ public class UserControllerTests {
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/users")
-            .body(body)
+            .body(inadequateBody)
             .exchange()
         ;
 
         // Assert.
         responseSpec
-            .expectStatus().isBadRequest()
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
         ;
 
-        String expectedJSONString = """
+        String expectedJSONString =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "email": "must not be blank"
                 }
-            }    
+            }
             """
         ;
         responseSpec
@@ -134,7 +136,7 @@ public class UserControllerTests {
         String email = "john.doe@protonmail.com";
         String password = "123";
 
-        Map<String, String> body = Map.of(
+        Map<String, String> inadequateBody = Map.of(
             "email", email,
             "password", password
         );
@@ -142,22 +144,23 @@ public class UserControllerTests {
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/users")
-            .body(body)
+            .body(inadequateBody)
             .exchange()
         ;
 
         // Assert.
         responseSpec
-            .expectStatus().isBadRequest()
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
         ;
 
-        String expectedJSONString = """
+        String expectedJSONString =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "username": "must not be blank"
                 }
-            }    
+            }
             """
         ;
         responseSpec
@@ -177,14 +180,14 @@ public class UserControllerTests {
         // Arrange.
         String username = "test-" + "jd";
         String email = "test-" + "john.doe@protonmail.com";
-        String password = "a".repeat(72 + 1);
+        String inadmissiblePassword = "a".repeat(72 + 1);
 
         UserRequestCreate userRequestCreate = new UserRequestCreate(
             username,
             email,
-            password
+            inadmissiblePassword
         );
-    
+
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/users")
@@ -193,7 +196,8 @@ public class UserControllerTests {
         ;
 
         // Assert.
-        String expectedBodyJSON = """
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
@@ -203,7 +207,7 @@ public class UserControllerTests {
             """
         ;
         responseSpec
-            .expectStatus().isBadRequest()
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
@@ -236,14 +240,15 @@ public class UserControllerTests {
 
         // Assert.
         UserResponseCreate userResponseCreate = responseSpec
-            .expectStatus().isCreated()
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
             .expectBody(UserResponseCreate.class)
             .returnResult()
             .getResponseBody()
         ;
 
         long userId = userResponseCreate.id();
-        String expectedBodyJSON = """
+        String expectedBodyJSON =
+            """
             {
                 id: %d,
                 username: %s,
@@ -276,8 +281,8 @@ public class UserControllerTests {
 
     /**
      * The `@Size(max = 72)` annotation on `UserRequestCreate.password`
-     * counts characters counts characters, not bytes.
-     * 
+     * counts characters, not bytes.
+     *
      * That enables the controller to accept a password that
      * is <= 72 characters long but > 72 bytes in UTF-8,
      * which `BCryptPasswordEncoder.encode` will reject,
@@ -290,12 +295,12 @@ public class UserControllerTests {
         String email = "john.doe@protonmail.com";
         // The following value is <= 72 characters long (and thus passes validation),
         // but it is 144 bytes in UTF-8.
-        String password = "é".repeat(72);
+        String inadmissiblePassword = "é".repeat(72);
 
         UserRequestCreate userRequestCreate = new UserRequestCreate(
             username,
             email,
-            password
+            inadmissiblePassword
         );
 
         // Act.
@@ -306,7 +311,8 @@ public class UserControllerTests {
         ;
 
         // Assert.
-        String expectedBodyJSON = """
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
@@ -332,12 +338,12 @@ public class UserControllerTests {
     void create_7() {
         // Arrange.
         String username = "jd";
-        String email = "x";
+        String inadmissibleEmail = "x";
         String password = "123";
 
         UserRequestCreate userRequestCreate = new UserRequestCreate(
             username,
-            email,
+            inadmissibleEmail,
             password
         );
 
@@ -349,7 +355,8 @@ public class UserControllerTests {
         ;
 
         // Assert.
-        String expectedBodyJSON = """
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
@@ -359,7 +366,7 @@ public class UserControllerTests {
             """
         ;
         responseSpec
-            .expectStatus().isBadRequest()
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
@@ -372,8 +379,8 @@ public class UserControllerTests {
      * should be rejected
      * without echoing the details of the parsing error.
      *
-     * 
-     * 
+     *
+     *
      * «Spring MVC»'s `DefaultHandlerExceptionResolver` turns
      * the ensuing `HttpMessageNotReadableException` into `response.sendError(400)`.
      *
@@ -389,7 +396,8 @@ public class UserControllerTests {
     @Test
     void create_8() {
         // Arrange.
-        String malformedBody = """
+        String malformedBody =
+            """
             {
                 "username": "jd",
                 "email":
@@ -405,14 +413,15 @@ public class UserControllerTests {
         ;
 
         // Assert.
-        String expectedBodyJSON = """
+        String expectedBodyJSON =
+            """
             {
                 "error": "Malformed request body"
             }
             """
         ;
         responseSpec
-            .expectStatus().isBadRequest()
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
@@ -436,32 +445,16 @@ public class UserControllerTests {
             email,
             password
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
 
-        UserResponseCreate userResponseCreate = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        TokenResponse tokenResponse = restTestClient
-            .post().uri("/api/v1/tokens")
-            .headers(
-                h -> h.setBasicAuth(
-                    userRequestCreate.email(),
-                    userRequestCreate.password()
-                )
-            )
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody(TokenResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-        String accessToken = tokenResponse.accessToken();
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            email,
+            password
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
@@ -471,10 +464,10 @@ public class UserControllerTests {
             )
             .exchange()
         ;
-        
+
         // Assert.
         responseSpec
-            .expectStatus().isUnauthorized()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
             .expectHeader().valueEquals(
                 "WWW-Authenticate",
                 "Basic realm=\"Realm\", charset=\"UTF-8\""
@@ -489,44 +482,33 @@ public class UserControllerTests {
     @Test
     void delete_2() {
         // Arrange.
-        UserRequestCreate userRequestCreate1 = new UserRequestCreate(
+        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
             "jd",
             "john.doe@protonmail.com",
             "123"
         );
+        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            jdUserRequestCreate
+        );
 
-        UserResponseCreate userResponseCreate1 = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate1)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        UserRequestCreate userRequestCreate2 = new UserRequestCreate(
+        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
             "ms",
             "mary.smith@protonmail.com",
             "456"
         );
-
-        UserResponseCreate userResponseCreate2 = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate2)
-            .exchange()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
+        UserResponseCreate msUserResponseCreate = Utilities.createUser(
+            restTestClient,
+            msUserRequestCreate
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
-            .delete().uri("/api/v1/users/" + userResponseCreate1.id())
+            .delete().uri("/api/v1/users/" + jdUserResponseCreate.id())
             .headers(
                 h -> h.setBasicAuth(
-                    userRequestCreate2.email(),
-                    userRequestCreate2.password()
+                    msUserRequestCreate.email(),
+                    msUserRequestCreate.password()
                 )
             )
             .exchange()
@@ -534,7 +516,7 @@ public class UserControllerTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isForbidden()
+            .expectStatus().isEqualTo(HttpStatus.FORBIDDEN)
         ;
 
         responseSpec
@@ -561,16 +543,10 @@ public class UserControllerTests {
             email,
             password
         );
-
-        UserResponseCreate userResponseCreate = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
@@ -586,7 +562,7 @@ public class UserControllerTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isNoContent()
+            .expectStatus().isEqualTo(HttpStatus.NO_CONTENT)
             .expectBody().isEmpty()
         ;
     }

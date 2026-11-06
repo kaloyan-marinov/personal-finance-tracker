@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kaloyan_marinov.personal_finance_tracker.Utilities;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserResponseCreate;
 
@@ -42,7 +43,7 @@ and then the `RestTestClient` binds to the created `MockMvc` bean.
 @AutoConfigureMockMvc
 @Transactional
 class TokenControllerTests {
-    
+
     @Autowired
     private RestTestClient restTestClient;
 
@@ -54,11 +55,15 @@ class TokenControllerTests {
 
     @Test
     void create_1() {
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/tokens")
             .exchange()
-            .expectStatus().isUnauthorized()
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
             .expectHeader().doesNotExist("Set-Cookie")
         ;
     }
@@ -89,47 +94,24 @@ class TokenControllerTests {
         );
     }
 
-    private UserResponseCreate createUser(
-        String username,
-        String email,
-        String password
-    ) {
-        UserRequestCreate userRequestCreate = new UserRequestCreate(
-            username,
-            email,
-            password
-        );
-
-        UserResponseCreate userResponseCreate = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return userResponseCreate;
-    }
-
     @Test
     void create_3() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String wrongUsername = "wrong-" + email;
-        String wrongPassword = "wrong-" + password;
+        String wrongUsername = "wrong-" + userRequestCreate.email();
+        String wrongPassword = "wrong-" + userRequestCreate.password();
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/tokens")
             .headers(
                 h -> h.setBasicAuth(
@@ -138,57 +120,36 @@ class TokenControllerTests {
                 )
             )
             .exchange()
-            .expectStatus().isUnauthorized()
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
         ;
     }
 
     @Test
     void create_4() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String wrongPassword = "wrong-" + password;
-
-        // Act + Assert.
-        restTestClient
-            .post().uri("/api/v1/tokens")
-            .headers(
-                h -> h.setBasicAuth(
-                    email,
-                    wrongPassword
-                )
-            )
-            .exchange()
-            .expectStatus().isUnauthorized()
-        ;
-    }
-
-    @Test
-    void create_5() {
-        // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
-        );
+        String wrongPassword = "wrong-" + userRequestCreate.password();
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/tokens")
             .headers(
                 h -> h.setBasicAuth(
-                    email,
-                    password
+                    userRequestCreate.email(),
+                    wrongPassword
                 )
             )
             .exchange()
@@ -196,7 +157,38 @@ class TokenControllerTests {
 
         // Assert.
         responseSpec
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
+        ;
+    }
+
+    @Test
+    void create_5() {
+        // Arrange.
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .post().uri("/api/v1/tokens")
+            .headers(
+                h -> h.setBasicAuth(
+                    userRequestCreate.email(),
+                    userRequestCreate.password()
+                )
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody()
             .jsonPath("$.length()").isEqualTo(1)
             .jsonPath("$.accessToken").value(
@@ -211,39 +203,40 @@ class TokenControllerTests {
     @Test
     void create_6() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
+        // Act.
+        // (
+        // At first sight,
+        // it might seem faulty
+        // for the encompassing test case
+        // to invoke the `Utilities.obtainAccessToken` method.
+        //
+        // However,
+        // the purpose of the encompassing test case is not solely to obtain a token;
+        // its purpose is to make assertions about the structure of the obtained token.
+        // )
         Instant instantBefore = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
-        // Act.
-        TokenResponse tokenResponse = restTestClient
-            .post().uri("/api/v1/tokens")
-            .headers(
-                h -> h.setBasicAuth(
-                    email,
-                    password
-                )
-            )
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody(TokenResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-        String accessToken = tokenResponse.accessToken();
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
 
         Instant instantAfter = Instant.now();
 
+        // Assert.
         Jwt jwt = jwtDecoder.decode(accessToken);
 
-        // Assert.
         Assertions.assertEquals(
             "HS256",
             jwt.getHeaders().get("alg")
@@ -280,31 +273,32 @@ class TokenControllerTests {
     @Test
     void create_7() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
         // Act.
-        TokenResponse tokenResponse = restTestClient
-            .post().uri("/api/v1/tokens")
-            .headers(
-                h -> h.setBasicAuth(
-                    email,
-                    password
-                )
-            )
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody(TokenResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-        String accessToken = tokenResponse.accessToken();
+        // (
+        // At first sight,
+        // it might seem faulty
+        // for the encompassing test case
+        // to invoke the `Utilities.obtainAccessToken` method.
+        //
+        // However,
+        // the purpose of the encompassing test case is not solely to obtain a token;
+        // its purpose is to make assertions about the payload of the obtained token.
+        // )
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
 
         // Assert.
         String encodedPayload = accessToken.split("\\.")[1];
@@ -314,16 +308,24 @@ class TokenControllerTests {
         );
 
         Assertions.assertTrue(
-            payload.contains(username)
+            payload.contains(
+                userRequestCreate.username()
+            )
         );
         Assertions.assertTrue(
-            payload.contains(userResponseCreate.id().toString())
+            payload.contains(
+                userResponseCreate.id().toString()
+            )
         );
         Assertions.assertFalse(
-            payload.contains(email)
+            payload.contains(
+                userRequestCreate.email()
+            )
         );
         Assertions.assertFalse(
-            payload.contains(password)
+            payload.contains(
+                userRequestCreate.password()
+            )
         );
     }
 

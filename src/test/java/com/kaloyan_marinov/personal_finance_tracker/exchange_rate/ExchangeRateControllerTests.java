@@ -2,6 +2,7 @@ package com.kaloyan_marinov.personal_finance_tracker.exchange_rate;
 
 import java.math.BigDecimal;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
@@ -12,7 +13,7 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
+import com.kaloyan_marinov.personal_finance_tracker.Utilities;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserResponseCreate;
 
@@ -37,68 +38,6 @@ class ExchangeRateControllerTests {
     @Autowired
     private RestTestClient restTestClient;
 
-    private UserResponseCreate createUser(
-        String username,
-        String email,
-        String password
-    ) {
-        UserRequestCreate userRequestCreate = new UserRequestCreate(
-            username,
-            email,
-            password
-        );
-        UserResponseCreate userResponseCreate = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return userResponseCreate;
-    }
-
-    private String obtainAccessToken(
-        String email,
-        String password
-    ) {
-        TokenResponse tokenResponse = restTestClient
-            .post().uri("/api/v1/tokens")
-            .headers(
-                h -> h.setBasicAuth(
-                    email,
-                    password
-                )
-            )
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody(TokenResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return tokenResponse.accessToken();
-    }
-
-    private ExchangeRateResponse createExchangeRate(
-        String accessToken,
-        ExchangeRateRequestCreate exchangeRateRequestCreate
-    ) {
-        return restTestClient
-            .post().uri("/api/v1/exchange-rates")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(exchangeRateRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(ExchangeRateResponse.class)
-            .returnResult()
-            .getResponseBody();
-    }
-
     /**
      * POSTs a valid exchange rate whose factor uses all 8 decimal places
      * and reads it back by its natural key.
@@ -106,19 +45,20 @@ class ExchangeRateControllerTests {
     @Test
     void create_01() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -129,13 +69,25 @@ class ExchangeRateControllerTests {
         );
 
         // Act.
-        ExchangeRateResponse exchangeRateResponse = createExchangeRate(
-            accessToken,
-            exchangeRateRequestCreate
-        );
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(exchangeRateRequestCreate)
+            .exchange()
+        ;
 
         // Assert.
-        String expectedBodyJSON = """
+        ExchangeRateResponse exchangeRateResponse = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
+            .expectBody(ExchangeRateResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
+        String expectedBodyJSON =
+            """
             {
                 id: %d,
                 year: 2001,
@@ -143,7 +95,10 @@ class ExchangeRateControllerTests {
                 targetCurrency: "EUR",
                 sourceToTargetFactor: 0.00571234
             }
-        """.formatted(exchangeRateResponse.id());
+            """.formatted(
+                exchangeRateResponse.id()
+            )
+        ;
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2001/JPY/EUR")
@@ -151,11 +106,12 @@ class ExchangeRateControllerTests {
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -165,60 +121,74 @@ class ExchangeRateControllerTests {
     @Test
     void create_02() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
-
-        Integer year = 2002;
-        String sourceCurrency = "EUR";
-        String targetCurrency = "USD";
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-            year,
-            sourceCurrency,
-            targetCurrency,
+            2002,
+            "EUR",
+            "USD",
             new BigDecimal("1.085")
         );
-        createExchangeRate(accessToken, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = restTestClient
+            .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(exchangeRateRequestCreate)
+            .exchange()
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
+            .expectBody(ExchangeRateResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
 
-        
-        // Act + Assert.
         ExchangeRateRequestCreate duplicateExchRateReqCreate = new ExchangeRateRequestCreate(
-            year,
-            sourceCurrency,
-            targetCurrency,
+            exchangeRateRequestCreate.year(),
+            exchangeRateRequestCreate.sourceCurrency(),
+            exchangeRateRequestCreate.targetCurrency(),
             new BigDecimal("1.1")
         );
 
-        String expectedBodyJSON = """
-            {
-                "error": "Exchange rate already exists"
-            }
-        """;
-
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/exchange-rates")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(duplicateExchRateReqCreate)
             .exchange()
-            .expectStatus().isEqualTo(409)
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
+            {
+                "error": "Exchange rate already exists"
+            }
+            """
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.CONFLICT)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -228,19 +198,20 @@ class ExchangeRateControllerTests {
     @Test
     void create_03() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
@@ -249,16 +220,53 @@ class ExchangeRateControllerTests {
             "XYZ",
             new BigDecimal("4")
         );
+        ExchangeRateResponse exchangeRateResponse = restTestClient
+            .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(exchangeRateRequestCreate1)
+            .exchange()
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
+            .expectBody(ExchangeRateResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
         ExchangeRateRequestCreate exchangeRateRequestCreate2 = new ExchangeRateRequestCreate(
-            2003,
-            "XYZ",
-            "ABC",
+            exchangeRateRequestCreate1.year(),
+            exchangeRateRequestCreate1.targetCurrency(),
+            exchangeRateRequestCreate1.sourceCurrency(),
             new BigDecimal("0.25")
         );
 
-        // Act + Assert.
-        createExchangeRate(accessToken, exchangeRateRequestCreate1);
-        createExchangeRate(accessToken, exchangeRateRequestCreate2);
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .post().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(exchangeRateRequestCreate2)
+            .exchange()
+        ;
+
+        // Assert.
+        ExchangeRateResponse observed = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
+            .expectBody(ExchangeRateResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
+        ExchangeRateResponse expected = new ExchangeRateResponse(
+            observed.id(),
+            exchangeRateRequestCreate2.year(),
+            exchangeRateRequestCreate2.sourceCurrency(),
+            exchangeRateRequestCreate2.targetCurrency(),
+            exchangeRateRequestCreate2.sourceToTargetFactor()
+        );
+
+        Assertions.assertEquals(expected, observed);
     }
 
     /**
@@ -268,50 +276,59 @@ class ExchangeRateControllerTests {
     @Test
     void create_04() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
+        Integer inadmissibleYear = null;
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-            null,
+            inadmissibleYear,
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
-            {
-                "error": "Validation failed",
-                "fieldErrors": {
-                    "year": "must not be null"
-                }
-            }
-        """;
-
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/exchange-rates")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(exchangeRateRequestCreate)
             .exchange()
-            .expectStatus().isBadRequest()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
+            {
+                "error": "Validation failed",
+                "fieldErrors": {
+                    "year": "must not be null"
+                }
+            }
+            """
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -322,55 +339,68 @@ class ExchangeRateControllerTests {
     @Test
     void create_05() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
-        Integer year = 2005;
-        String trgtCurrency = "USD";
-        BigDecimal amount = new BigDecimal("1.085");
-
-        for (String srcCurrency : new String[] {"", "eur", "Eur", "EU", "EURO", "E1R"}) {
+        for (
+            String inadmissibleSourceCurrency : new String[] {
+                "",
+                "eur",
+                "Eur",
+                "EU",
+                "EURO",
+                "E1R"
+            }
+        ) {
             ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-                year,
-                srcCurrency,
-                trgtCurrency,
-                amount
+                2005,
+                inadmissibleSourceCurrency,
+                "USD",
+                new BigDecimal("1.085")
             );
 
-            // Act + Assert.
-            String expectedBodyJSON = """
-                {
-                    "error": "Validation failed",
-                    "fieldErrors": {
-                        "sourceCurrency": "must match \\"^[A-Z]{3}$\\""
-                    }
-                }
-            """;
-
-            restTestClient
+            // Act.
+            RestTestClient.ResponseSpec responseSpec = restTestClient
                 .post().uri("/api/v1/exchange-rates")
                 .headers(
                     h -> h.setBearerAuth(accessToken)
                 )
                 .body(exchangeRateRequestCreate)
                 .exchange()
-                .expectStatus().isBadRequest()
+            ;
+
+            // Assert.
+            String expectedBodyJSON =
+                """
+                {
+                    "error": "Validation failed",
+                    "fieldErrors": {
+                        "sourceCurrency": "must match \\"^[A-Z]{3}$\\""
+                    }
+                }
+                """
+            ;
+
+            responseSpec
+                .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
                 .expectBody().json(
                     expectedBodyJSON,
                     JsonCompareMode.STRICT
-                );
+                )
+            ;
         }
     }
 
@@ -382,56 +412,68 @@ class ExchangeRateControllerTests {
     @Test
     void create_06() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
-        Integer year = 2006;
-        String srcCurrency = "USD";
-        BigDecimal amount = new BigDecimal("0.92");
-
-        for (String trgtCurrency : new String[] {"", "eur", "Eur", "EU", "EURO", "E1R"}) {
-            // Arrange.
+        for (
+            String inadmissibleTargetCurrency : new String[] {
+                "",
+                "eur",
+                "Eur",
+                "EU",
+                "EURO",
+                "E1R"
+            }
+        ) {
             ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-                year,
-                srcCurrency,
-                trgtCurrency,
-                amount
+                2006,
+                "USD",
+                inadmissibleTargetCurrency,
+                new BigDecimal("0.92")
             );
 
-            // Act + Assert.
-            String expectedBodyJSON = """
-                {
-                    "error": "Validation failed",
-                    "fieldErrors": {
-                        "targetCurrency": "must match \\"^[A-Z]{3}$\\""
-                    }
-                }
-            """;
-
-            restTestClient
+            // Act.
+            RestTestClient.ResponseSpec responseSpec = restTestClient
                 .post().uri("/api/v1/exchange-rates")
                 .headers(
                     h -> h.setBearerAuth(accessToken)
                 )
                 .body(exchangeRateRequestCreate)
                 .exchange()
-                .expectStatus().isBadRequest()
+            ;
+
+            // Assert.
+            String expectedBodyJSON =
+                """
+                {
+                    "error": "Validation failed",
+                    "fieldErrors": {
+                        "targetCurrency": "must match \\"^[A-Z]{3}$\\""
+                    }
+                }
+                """
+            ;
+
+            responseSpec
+                .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
                 .expectBody().json(
                     expectedBodyJSON,
                     JsonCompareMode.STRICT
-                );
+                )
+            ;
         }
     }
 
@@ -443,19 +485,20 @@ class ExchangeRateControllerTests {
     @Test
     void create_07() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         String sameCurrency = "EUR";
@@ -467,28 +510,35 @@ class ExchangeRateControllerTests {
             new BigDecimal("1")
         );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
-            {
-                "error": "Validation failed",
-                "fieldErrors": {
-                    "distinctCurrencies": "sourceCurrency and targetCurrency must differ"
-                }
-            }
-        """;
-
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/exchange-rates")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(exchangeRateRequestCreate)
             .exchange()
-            .expectStatus().isBadRequest()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
+            {
+                "error": "Validation failed",
+                "fieldErrors": {
+                    "distinctCurrencies": "sourceCurrency and targetCurrency must differ"
+                }
+            }
+            """
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -500,117 +550,135 @@ class ExchangeRateControllerTests {
     @Test
     void create_08() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
-        Integer year = 2008;
-        String srcCurrency = "EUR";
-        String tgtCurrency = "USD";
-
-        for (String srcToTrgtFactor : new String[] {"0", "-1.085"}) {
+        for (
+            BigDecimal inadmissibleSourceToTargetFactor : new BigDecimal[] {
+                new BigDecimal("0"),
+                new BigDecimal("-1.085")
+            }
+        ) {
             ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-                year,
-                srcCurrency,
-                tgtCurrency,
-                new BigDecimal(srcToTrgtFactor)
+                2008,
+                "EUR",
+                "USD",
+                inadmissibleSourceToTargetFactor
             );
 
-            // Act + Assert.
-            String expectedBodyJSON = """
+            // Act.
+            RestTestClient.ResponseSpec responseSpec = restTestClient
+                .post().uri("/api/v1/exchange-rates")
+                .headers(
+                    h -> h.setBearerAuth(accessToken)
+                )
+                .body(exchangeRateRequestCreate)
+                .exchange()
+            ;
+
+            // Assert.
+            String expectedBodyJSON =
+                """
                 {
                     "error": "Validation failed",
                     "fieldErrors": {
                         "sourceToTargetFactor": "must be greater than 0"
                     }
                 }
-            """;
+                """
+            ;
 
-            restTestClient
-                .post().uri("/api/v1/exchange-rates")
-                .headers(
-                    h -> h.setBearerAuth(accessToken)
-                )
-                .body(exchangeRateRequestCreate)
-                .exchange()
-                .expectStatus().isBadRequest()
+            responseSpec
+                .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
                 .expectBody().json(
                     expectedBodyJSON,
                     JsonCompareMode.STRICT
-                );
+                )
+            ;
         }
     }
 
     /**
      * Attempt to create an exchange rate with
-     * an admissible value for {@code sourceToTargetFactor}
-     * but an inadmissible data type:
+     * inadmissible values for {@code sourceToTargetFactor}:
+     * positive, but violating {@code @Digits(integer = 10, fraction = 8)} -
      * one with 9 decimal places
      * and one with 11 integer digits.
      */
     @Test
     void create_09() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
-        
-        Integer year = 2009;
-        String srcCurrency = "EUR";
-        String tgtCurrency = "USD";
 
-        for (String srcToTrgtFactor : new String[] {"0.000000001", "12345678901"}) {
+        for (
+            BigDecimal inadmissibleSourceToTargetFactor : new BigDecimal[] {
+                new BigDecimal("0.000000001"),
+                new BigDecimal("12345678901")
+            }
+        ) {
             ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
-                year,
-                srcCurrency,
-                tgtCurrency,
-                new BigDecimal(srcToTrgtFactor)
+                2009,
+                "EUR",
+                "USD",
+                inadmissibleSourceToTargetFactor
             );
 
-            // Act + Assert.
-            String expectedBodyJSON = """
-                {
-                    "error": "Validation failed",
-                    "fieldErrors": {
-                        "sourceToTargetFactor": "numeric value out of bounds (<10 digits>.<8 digits> expected)"
-                    }
-                }
-            """;
-
-            restTestClient
+            // Act.
+            RestTestClient.ResponseSpec responseSpec = restTestClient
                 .post().uri("/api/v1/exchange-rates")
                 .headers(
                     h -> h.setBearerAuth(accessToken)
                 )
                 .body(exchangeRateRequestCreate)
                 .exchange()
-                .expectStatus().isBadRequest()
+            ;
+
+            // Assert.
+            String expectedBodyJSON =
+                """
+                {
+                    "error": "Validation failed",
+                    "fieldErrors": {
+                        "sourceToTargetFactor": "numeric value out of bounds (<10 digits>.<8 digits> expected)"
+                    }
+                }
+                """
+            ;
+
+            responseSpec
+                .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
                 .expectBody().json(
                     expectedBodyJSON,
                     JsonCompareMode.STRICT
-                );
+                )
+            ;
         }
     }
 
@@ -622,27 +690,28 @@ class ExchangeRateControllerTests {
     @Test
     void create_10() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         restTestClient
             .delete().uri("/api/v1/users/" + userResponseCreate.id())
             .headers(
                 h -> h.setBasicAuth(
-                    email,
-                    password
+                    userRequestCreate.email(),
+                    userRequestCreate.password()
                 )
             )
             .exchange()
@@ -691,30 +760,36 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveOne_1() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/exchange-rates/2001/EUR/USD")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isNotFound()
-            .expectBody().isEmpty();
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+            .expectBody().isEmpty()
+        ;
     }
 
     /**
@@ -724,42 +799,52 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveOne_2() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        String inadmissibleYear = "abc";
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/exchange-rates/" + inadmissibleYear + "/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "year": "must be of type Integer"
                 }
             }
-        """;
+            """
+        ;
 
-        restTestClient
-            .get().uri("/api/v1/exchange-rates/abc/EUR/USD")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .exchange()
-            .expectStatus().isBadRequest()
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -770,19 +855,20 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveOne_3() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -791,29 +877,103 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        createExchangeRate(accessToken, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate
+        );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        String inadmissibleSourceCurrency = "eur";
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/exchange-rates/2003/" + inadmissibleSourceCurrency + "/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "sourceCurrency": "must match \\"^[A-Z]{3}$\\""
                 }
             }
-        """;
+            """
+        ;
 
-        restTestClient
-            .get().uri("/api/v1/exchange-rates/2003/eur/USD")
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
+            .expectBody().json(
+                expectedBodyJSON,
+                JsonCompareMode.STRICT
+            )
+        ;
+    }
+
+    /**
+     * This tests the happy path.
+     */
+    @Test
+    void retrieveOne_4() {
+        // Arrange.
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
+
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
+        ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
+            2003,
+            "EUR",
+            "USD",
+            new BigDecimal("1.085")
+        );
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate
+        );
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/exchange-rates/2003/EUR/USD")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isBadRequest()
-            .expectBody().json(
-                expectedBodyJSON,
-                JsonCompareMode.STRICT
-            );
+        ;
+
+        // Assert.
+        ExchangeRateResponse observed = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
+            .expectBody(ExchangeRateResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
+
+        ExchangeRateResponse expected = new ExchangeRateResponse(
+            exchangeRateResponse.id(),
+            exchangeRateRequestCreate.year(),
+            exchangeRateRequestCreate.sourceCurrency(),
+            exchangeRateRequestCreate.targetCurrency(),
+            exchangeRateRequestCreate.sourceToTargetFactor()
+        );
+        Assertions.assertEquals(expected, observed);
     }
 
     /**
@@ -823,33 +983,39 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveAll_1() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/exchange-rates")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 "[]",
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -859,19 +1025,20 @@ class ExchangeRateControllerTests {
     @Test
     void retrieveAll_2() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
@@ -880,7 +1047,8 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRateResponse exchangeRateResponse1 = createExchangeRate(
+        ExchangeRateResponse exchangeRateResponse1 = Utilities.createExchangeRate(
+            restTestClient,
             accessToken,
             exchangeRateRequestCreate1
         );
@@ -891,13 +1059,24 @@ class ExchangeRateControllerTests {
             "EUR",
             new BigDecimal("1.06")
         );
-        ExchangeRateResponse exchangeRateResponse2 = createExchangeRate(
+        ExchangeRateResponse exchangeRateResponse2 = Utilities.createExchangeRate(
+            restTestClient,
             accessToken,
             exchangeRateRequestCreate2
         );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/exchange-rates")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             [
                 {
                     id: %d,
@@ -914,22 +1093,19 @@ class ExchangeRateControllerTests {
                     sourceToTargetFactor: 1.06
                 }
             ]
-        """.formatted(
-            exchangeRateResponse1.id(),
-            exchangeRateResponse2.id()
-        );
-
-        restTestClient
-            .get().uri("/api/v1/exchange-rates")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
+            """.formatted(
+                exchangeRateResponse1.id(),
+                exchangeRateResponse2.id()
             )
-            .exchange()
-            .expectStatus().isOk()
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -939,19 +1115,20 @@ class ExchangeRateControllerTests {
     @Test
     void update_1() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -960,17 +1137,29 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRateResponse exchangeRateResponse = createExchangeRate(
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
             accessToken,
             exchangeRateRequestCreate
         );
 
-        // Act + Assert.
         ExchangeRateRequestUpdate exchangeRateRequestUpdate = new ExchangeRateRequestUpdate(
             new BigDecimal("1.1")
         );
 
-        String expectedBodyJSON = """
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .put().uri("/api/v1/exchange-rates/2001/EUR/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(exchangeRateRequestUpdate)
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 id: %d,
                 year: 2001,
@@ -978,20 +1167,18 @@ class ExchangeRateControllerTests {
                 targetCurrency: "USD",
                 sourceToTargetFactor: 1.1
             }
-        """.formatted(exchangeRateResponse.id());
-
-        restTestClient
-            .put().uri("/api/v1/exchange-rates/2001/EUR/USD")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
+            """.formatted(
+                exchangeRateResponse.id()
             )
-            .body(exchangeRateRequestUpdate)
-            .exchange()
-            .expectStatus().isOk()
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2001/EUR/USD")
@@ -999,11 +1186,12 @@ class ExchangeRateControllerTests {
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -1013,35 +1201,41 @@ class ExchangeRateControllerTests {
     @Test
     void update_2() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestUpdate exchangeRateRequestUpdate = new ExchangeRateRequestUpdate(
             new BigDecimal("1.1")
         );
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .put().uri("/api/v1/exchange-rates/2002/EUR/USD")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(exchangeRateRequestUpdate)
             .exchange()
-            .expectStatus().isNotFound()
-            .expectBody().isEmpty();
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+            .expectBody().isEmpty()
+        ;
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2002/EUR/USD")
@@ -1049,8 +1243,9 @@ class ExchangeRateControllerTests {
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isNotFound()
-            .expectBody().isEmpty();
+            .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+            .expectBody().isEmpty()
+        ;
     }
 
     /**
@@ -1060,19 +1255,20 @@ class ExchangeRateControllerTests {
     @Test
     void update_3() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -1081,39 +1277,49 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRateResponse exchangeRateResponse = createExchangeRate(
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
             accessToken,
             exchangeRateRequestCreate
         );
 
+        BigDecimal inadmissibleSourceToTargetFactor = new BigDecimal("0");
         ExchangeRateRequestUpdate updateRequest = new ExchangeRateRequestUpdate(
-            new BigDecimal("0")
+            inadmissibleSourceToTargetFactor
         );
 
-        // Act + Assert.
-        String expectedBodyJSON1 = """
-            {
-                "error": "Validation failed",
-                "fieldErrors": {
-                    "sourceToTargetFactor": "must be greater than 0"
-                }
-            }
-        """;
-
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .put().uri("/api/v1/exchange-rates/2003/EUR/USD")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(updateRequest)
             .exchange()
-            .expectStatus().isBadRequest()
+        ;
+
+        // Assert.
+        String expectedBodyJSON1 =
+            """
+            {
+                "error": "Validation failed",
+                "fieldErrors": {
+                    "sourceToTargetFactor": "must be greater than 0"
+                }
+            }
+            """
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON1,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
 
-        String expectedBodyJSON2 = """
+        String expectedBodyJSON2 =
+            """
             {
                 id: %d,
                 year: 2003,
@@ -1121,7 +1327,10 @@ class ExchangeRateControllerTests {
                 targetCurrency: "USD",
                 sourceToTargetFactor: 1.085
             }
-        """.formatted(exchangeRateResponse.id());
+            """.formatted(
+                exchangeRateResponse.id()
+            )
+        ;
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2003/EUR/USD")
@@ -1129,11 +1338,12 @@ class ExchangeRateControllerTests {
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON2,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -1143,19 +1353,20 @@ class ExchangeRateControllerTests {
     @Test
     void update_4() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -1164,7 +1375,8 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRateResponse exchangeRateResponse = createExchangeRate(
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
             accessToken,
             exchangeRateRequestCreate
         );
@@ -1173,30 +1385,40 @@ class ExchangeRateControllerTests {
             new BigDecimal("1.1")
         );
 
-        // Act + Assert.
-        String expectedBodyJSON1 = """
+        String inadmissibleTargetCurrency = "usd";
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .put().uri("/api/v1/exchange-rates/2004/EUR/" + inadmissibleTargetCurrency)
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(updateRequest)
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON1 =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "targetCurrency": "must match \\"^[A-Z]{3}$\\""
                 }
             }
-        """;
+            """
+        ;
 
-        restTestClient
-            .put().uri("/api/v1/exchange-rates/2004/EUR/usd")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(updateRequest)
-            .exchange()
-            .expectStatus().isBadRequest()
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON1,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
 
-        String expectedBodyJSON2 = """
+        String expectedBodyJSON2 =
+            """
             {
                 id: %d,
                 year: 2004,
@@ -1204,7 +1426,10 @@ class ExchangeRateControllerTests {
                 targetCurrency: "USD",
                 sourceToTargetFactor: 1.085
             }
-        """.formatted(exchangeRateResponse.id());
+            """.formatted(
+                exchangeRateResponse.id()
+            )
+        ;
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2004/EUR/USD")
@@ -1212,11 +1437,12 @@ class ExchangeRateControllerTests {
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON2,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -1226,30 +1452,36 @@ class ExchangeRateControllerTests {
     @Test
     void delete_1() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .delete().uri("/api/v1/exchange-rates/2001/EUR/USD")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isNotFound()
-            .expectBody().isEmpty();
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+            .expectBody().isEmpty()
+        ;
     }
 
     /**
@@ -1259,19 +1491,20 @@ class ExchangeRateControllerTests {
     @Test
     void delete_2() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -1280,17 +1513,26 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        createExchangeRate(accessToken, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate
+        );
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .delete().uri("/api/v1/exchange-rates/2002/EUR/USD")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isNoContent()
-            .expectBody().isEmpty();
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.NO_CONTENT)
+            .expectBody().isEmpty()
+        ;
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2002/EUR/USD")
@@ -1298,8 +1540,9 @@ class ExchangeRateControllerTests {
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isNotFound()
-            .expectBody().isEmpty();
+            .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+            .expectBody().isEmpty()
+        ;
     }
 
     /**
@@ -1309,19 +1552,20 @@ class ExchangeRateControllerTests {
     @Test
     void delete_3() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -1330,29 +1574,42 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        createExchangeRate(accessToken, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate
+        );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        String inadmissibleSourceCurrency = "eur";
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .delete().uri("/api/v1/exchange-rates/2003/" + inadmissibleSourceCurrency + "/USD")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "sourceCurrency": "must match \\"^[A-Z]{3}$\\""
                 }
             }
-        """;
+            """
+        ;
 
-        restTestClient
-            .delete().uri("/api/v1/exchange-rates/2003/eur/USD")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .exchange()
-            .expectStatus().isBadRequest()
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
 
         restTestClient
             .get().uri("/api/v1/exchange-rates/2003/EUR/USD")
@@ -1360,7 +1617,8 @@ class ExchangeRateControllerTests {
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk();
+            .expectStatus().isEqualTo(HttpStatus.OK)
+        ;
     }
 
     /**
@@ -1370,19 +1628,20 @@ class ExchangeRateControllerTests {
     @Test
     void delete_user() {
         // Arrange.
-        String username = "jd";
-        String email = "john.doe@protonmail.com";
-        String password = "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         ExchangeRateRequestCreate exchangeRateRequestCreate = new ExchangeRateRequestCreate(
@@ -1391,22 +1650,26 @@ class ExchangeRateControllerTests {
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRateResponse exchangeRateResponse = createExchangeRate(accessToken, exchangeRateRequestCreate);
+        ExchangeRateResponse exchangeRateResponse = Utilities.createExchangeRate(
+            restTestClient,
+            accessToken,
+            exchangeRateRequestCreate
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .delete().uri("/api/v1/users/" + userResponseCreate.id())
             .headers(
                 h -> h.setBasicAuth(
-                    email,
-                    password
+                    userRequestCreate.email(),
+                    userRequestCreate.password()
                 )
             )
             .exchange()
         ;
 
         // Assert.
-        String expectedBodyJSON = 
+        String expectedBodyJSON =
             """
             {
                 "error": "unable to delete your user, because you still have exchange rates"

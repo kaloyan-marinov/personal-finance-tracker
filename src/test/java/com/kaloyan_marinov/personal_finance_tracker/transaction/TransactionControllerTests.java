@@ -1,7 +1,6 @@
 package com.kaloyan_marinov.personal_finance_tracker.transaction;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import org.junit.jupiter.api.Assertions;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -16,7 +15,7 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.kaloyan_marinov.personal_finance_tracker.token.TokenResponse;
+import com.kaloyan_marinov.personal_finance_tracker.Utilities;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRequestCreate;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserResponseCreate;
 
@@ -38,149 +37,123 @@ and then the `RestTestClient` binds to the created `MockMvc` bean.
 @Transactional
 class TransactionControllerTests {
 
-    @Autowired 
+    @Autowired
     private RestTestClient restTestClient;
-
-    private UserResponseCreate createUser(
-        String username,
-        String email,
-        String password
-    ) {
-        UserRequestCreate userRequestCreate = new UserRequestCreate(
-            username,
-            email,
-            password
-        );
-        UserResponseCreate userResponseCreate = restTestClient
-            .post().uri("/api/v1/users")
-            .body(userRequestCreate)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(UserResponseCreate.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return userResponseCreate;
-    }
-
-    private String obtainAccessToken(
-        String email,
-        String password
-    ) {
-        TokenResponse tokenResponse = restTestClient
-            .post().uri("/api/v1/tokens")
-            .headers(
-                h -> h.setBasicAuth(
-                    email,
-                    password
-                )
-            )
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody(TokenResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
-
-        return tokenResponse.accessToken();
-    }
 
     @Test
     void create_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2001;
-        BigDecimal amount = null;
-        String currency = "EUR";
-        String description = "groceries";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
+        BigDecimal inadmissibleAmount = null;
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            2001,
+            inadmissibleAmount,
+            "EUR",
+            "groceries"
         );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
-            {
-                "error": "Validation failed",
-                "fieldErrors": {
-                    "amount": "must not be null"
-                }
-            }    
-        """;
-
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(transactionRequest)
             .exchange()
-            .expectStatus().isBadRequest()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
+            {
+                "error": "Validation failed",
+                "fieldErrors": {
+                    "amount": "must not be null"
+                }
+            }
+            """
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     @Test
     void create_2() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2002;
-        BigDecimal amount = new BigDecimal("-4.789");
-        String currency = "EUR";
-        String description = "groceries";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
+        BigDecimal inadmissibleAmount = new BigDecimal("-4.789");
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            2002,
+            inadmissibleAmount,
+            "EUR",
+            "groceries"
         );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .post().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .body(transactionRequest)
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 "error": "Validation failed",
                 "fieldErrors": {
                     "amount": "numeric value out of bounds (<16 digits>.<2 digits> expected)"
                 }
             }
-        """;
+            """
+        ;
 
-        restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(transactionRequest)
-            .exchange()
-            .expectStatus().isBadRequest()
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -192,100 +165,124 @@ class TransactionControllerTests {
     @Test
     void create_3() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
-        int year = 2003;
-        BigDecimal amount = new BigDecimal("-300.00");
-        String currency = "EUR";
 
-        for (String description : new String[] {null, "", " "}) {
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
+        for (
+            String inadmissibleDescription : new String[] {
+                null,
+                "",
+                " "
+            }
+        ) {
             TransactionRequest transactionRequest = new TransactionRequest(
-                year,
-                amount,
-                currency,
-                description
+                2003,
+                new BigDecimal("-300.00"),
+                "EUR",
+                inadmissibleDescription
             );
 
-            // Act + Assert.
-            String expectedBodyJSON = """
-                {
-                    "error": "Validation failed",
-                    "fieldErrors": {
-                        "description": "must not be blank"
-                    }
-                }
-            """;
-
-            restTestClient
+            // Act.
+            RestTestClient.ResponseSpec responseSpec = restTestClient
                 .post().uri("/api/v1/transactions")
                 .headers(
                     h -> h.setBearerAuth(accessToken)
                 )
                 .body(transactionRequest)
                 .exchange()
-                .expectStatus().isBadRequest()
+            ;
+
+            // Assert.
+            String expectedBodyJSON =
+                """
+                {
+                    "error": "Validation failed",
+                    "fieldErrors": {
+                        "description": "must not be blank"
+                    }
+                }
+                """
+            ;
+
+            responseSpec
+                .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
                 .expectBody().json(
                     expectedBodyJSON,
                     JsonCompareMode.STRICT
-                );
+                )
+            ;
         }
     }
 
     @Test
     void create_4() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2004;
-        BigDecimal amount = new BigDecimal("-400.00");
-        String currency = null;
-        String description = "groceries";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
+        String inadmissibleCurrency = null;
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            2004,
+            new BigDecimal("-400.00"),
+            inadmissibleCurrency,
+            "groceries"
         );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
-            {
-                "error": "Validation failed",
-                "fieldErrors": {
-                    "currency": "must not be null"
-                }
-            }
-        """;
-
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(transactionRequest)
             .exchange()
-            .expectStatus().isBadRequest()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
+            {
+                "error": "Validation failed",
+                "fieldErrors": {
+                    "currency": "must not be null"
+                }
+            }
+            """
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -296,101 +293,127 @@ class TransactionControllerTests {
     @Test
     void create_5() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2005;
-        BigDecimal amount = new BigDecimal("-500.00");
-        String description = "groceries";
-        
-        for (String currency : new String[] {"", "eur", "Eur", "EU", "EURO", "E1R"}) {
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
+        for (
+            String inadmissibleCurrency : new String[] {
+                "",
+                "eur",
+                "Eur",
+                "EU",
+                "EURO",
+                "E1R"
+            }
+        ) {
             TransactionRequest transactionRequest = new TransactionRequest(
-                year,
-                amount,
-                currency,
-                description
+                2005,
+                new BigDecimal("-500.00"),
+                inadmissibleCurrency,
+                "groceries"
             );
 
-            // Act + Assert.
-            String expectedBodyJSON = """
-                {
-                    "error": "Validation failed",
-                    "fieldErrors": {
-                        "currency": "must match \\"^[A-Z]{3}$\\""
-                    }
-                }
-            """;
-
-            restTestClient
+            // Act.
+            RestTestClient.ResponseSpec responseSpec = restTestClient
                 .post().uri("/api/v1/transactions")
                 .headers(
                     h -> h.setBearerAuth(accessToken)
                 )
                 .body(transactionRequest)
                 .exchange()
-                .expectStatus().isBadRequest()
+            ;
+
+            // Assert.
+            String expectedBodyJSON =
+                """
+                {
+                    "error": "Validation failed",
+                    "fieldErrors": {
+                        "currency": "must match \\"^[A-Z]{3}$\\""
+                    }
+                }
+                """
+            ;
+
+            responseSpec
+                .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
                 .expectBody().json(
                     expectedBodyJSON,
                     JsonCompareMode.STRICT
-                );
+                )
+            ;
         }
     }
 
     @Test
     void create_6() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2006;
-        BigDecimal amount = new BigDecimal("-600.00");
-        String currency = "EUR";
-        String description = "x".repeat(256);
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
+        String inadmissibleDescription = "x".repeat(256);
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            2006,
+            new BigDecimal("-600.00"),
+            "EUR",
+            inadmissibleDescription
         );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
-            {
-                "error": "Validation failed",
-                "fieldErrors": {
-                    "description": "size must be between 0 and 255"
-                }
-            }
-        """;
-
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(transactionRequest)
             .exchange()
-            .expectStatus().isBadRequest()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
+            {
+                "error": "Validation failed",
+                "fieldErrors": {
+                    "description": "size must be between 0 and 255"
+                }
+            }
+            """
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -402,61 +425,68 @@ class TransactionControllerTests {
     @Test
     void create_7() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2007;
-        BigDecimal amount = new BigDecimal("-700.00");
-        String currency = "CHF";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
         String description = "x".repeat(255);
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
+            2007,
+            new BigDecimal("-700.00"),
+            "CHF",
             description
         );
 
         // Act.
-        TransactionResponse transactionResponse = restTestClient
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(transactionRequest)
             .exchange()
-            .expectStatus().isCreated()
+        ;
+
+        // Assert.
+        TransactionResponse transactionResponse = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
             .expectBody(TransactionResponse.class)
             .returnResult()
-            .getResponseBody();
-            
-        // Assert.
-        assertEquals(
+            .getResponseBody()
+        ;
+
+        Assertions.assertEquals(
             transactionRequest.year(),
             transactionResponse.year()
         );
-        assertEquals(
+        Assertions.assertEquals(
             transactionRequest.amount(),
             transactionResponse.amount()
         );
-        assertEquals(
+        Assertions.assertEquals(
             transactionRequest.currency(),
             transactionResponse.currency()
         );
-        assertEquals(
+        Assertions.assertEquals(
             transactionRequest.description(),
             transactionResponse.description()
         );
-            
+
         long transactionId = transactionResponse.id();
-        String expectedBodyJSON = """
+        String expectedBodyJSON =
+            """
             {
                 id: %d,
                 year: 2007,
@@ -464,7 +494,11 @@ class TransactionControllerTests {
                 currency: "CHF",
                 description: "%s"
             }
-        """.formatted(transactionId, description);
+            """.formatted(
+                transactionId,
+                description
+            )
+        ;
 
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
@@ -472,11 +506,12 @@ class TransactionControllerTests {
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -487,26 +522,27 @@ class TransactionControllerTests {
     @Test
     void create_8() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2008;
-        BigDecimal amount = new BigDecimal("-800.00");
-        String currency = "EUR";
-        String description = "groceries";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            2008,
+            new BigDecimal("-800.00"),
+            "EUR",
+            "groceries"
         );
 
         TransactionResponse transactionResponse = restTestClient
@@ -516,10 +552,11 @@ class TransactionControllerTests {
             )
             .body(transactionRequest)
             .exchange()
-            .expectStatus().isCreated()
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
             .expectBody(TransactionResponse.class)
             .returnResult()
-            .getResponseBody();
+            .getResponseBody()
+        ;
         long transactionId = transactionResponse.id();
 
         // Since `TransactionRequest` has no `id`,
@@ -533,23 +570,28 @@ class TransactionControllerTests {
         );
 
         // Act.
-        TransactionResponse newTransactionResponse = restTestClient
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .post().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(newTransactionRequestWithId)
             .exchange()
-            .expectStatus().isCreated()
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody();
+        ;
 
         // Assert.
-        long newTransactionId = newTransactionResponse.id();
-        assertNotEquals(transactionId, newTransactionId);
+        TransactionResponse newTransactionResponse = responseSpec
+            .expectStatus().isEqualTo(HttpStatus.CREATED)
+            .expectBody(TransactionResponse.class)
+            .returnResult()
+            .getResponseBody()
+        ;
 
-        String expectedBodyJSON = """
+        long newTransactionId = newTransactionResponse.id();
+        Assertions.assertNotEquals(transactionId, newTransactionId);
+
+        String expectedBodyJSON =
+            """
             {
                 id: %d,
                 year: %d,
@@ -557,24 +599,26 @@ class TransactionControllerTests {
                 currency: "%s",
                 description: "%s"
             }
-        """.formatted(
-            transactionId,
-            year,
-            amount,
-            currency,
-            description
-        );
+            """.formatted(
+                transactionId,
+                transactionRequest.year(),
+                transactionRequest.amount(),
+                transactionRequest.currency(),
+                transactionRequest.description()
+            )
+        ;
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     /**
@@ -585,44 +629,41 @@ class TransactionControllerTests {
     @Test
     void create_9() {
         // Arrange.
-        String username = "test-" + "jd";
-        String email = "test-" + "john.doe@protonmail.com";
-        String password = "test-" + "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
-        );
-
-        int year = 2008;
-        BigDecimal amount = new BigDecimal("-800.00");
-        String currency = "EUR";
-        String description = "groceries";
-        TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         restTestClient
             .delete().uri("/api/v1/users/" + userResponseCreate.id())
             .headers(
                 h -> h.setBasicAuth(
-                    email,
-                    password
+                    userRequestCreate.email(),
+                    userRequestCreate.password()
                 )
             )
             .exchange()
             .expectStatus().isEqualTo(HttpStatus.NO_CONTENT)
             .expectBody().isEmpty()
         ;
+
+        TransactionRequest transactionRequest = new TransactionRequest(
+            2008,
+            new BigDecimal("-800.00"),
+            "EUR",
+            "groceries"
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
@@ -635,7 +676,7 @@ class TransactionControllerTests {
         ;
 
         // Assert.
-        String expectedBodyJSON = 
+        String expectedBodyJSON =
             """
             {
                 "error": "unauthorized to create a transaction"
@@ -654,70 +695,85 @@ class TransactionControllerTests {
     @Test
     void retrieveOne_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
 
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         long nonexistentId = 17;
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/transactions/" + nonexistentId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isNotFound()
-            .expectBody().isEmpty();
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+            .expectBody().isEmpty()
+        ;
     }
 
     @Test
     void retrieveOne_2() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2002;
-        BigDecimal amount = new BigDecimal("-200.00");
-        String currency = "EUR";
-        String description = "groceries";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            2002,
+            new BigDecimal("-200.00"),
+            "EUR",
+            "groceries"
         );
 
-        TransactionResponse transactionResponse = restTestClient
-            .post().uri("/api/v1/transactions")
+        TransactionResponse transactionResponse = Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequest
+        );
+        long transactionId = transactionResponse.id();
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/transactions/" + transactionId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
-            .body(transactionRequest)
             .exchange()
-            .expectStatus().isCreated()
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody();
-        long transactionId = transactionResponse.id();
+        ;
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 id: %d,
                 year: 2002,
@@ -725,115 +781,121 @@ class TransactionControllerTests {
                 currency: "EUR",
                 description: "groceries"
             }
-        """.formatted(transactionId);
-
-        restTestClient
-            .get().uri("/api/v1/transactions/" + transactionId)
-            .headers(
-                h -> h.setBearerAuth(accessToken)
+            """.formatted(
+                transactionId
             )
-            .exchange()
-            .expectStatus().isOk()
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     @Test
     void retrieveAll_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String expectedBodyJSON = """
-            []
-        """;
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .get().uri("/api/v1/transactions")
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
+            []
+            """
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     @Test
     void retrieveAll_2() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year6 = 2006;
-        BigDecimal amount6 = new BigDecimal("-600.00");
-        String currency6 = "EUR";
-        String description6 = "groceries";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
         TransactionRequest transactionRequest6 = new TransactionRequest(
-            year6,
-            amount6,
-            currency6,
-            description6
+            2006,
+            new BigDecimal("-600.00"),
+            "EUR",
+            "groceries"
         );
 
-        int year7 = 2007;
-        BigDecimal amount7 = new BigDecimal("-700.00");
-        String currency7 = "EUR";
-        String description7 = "groceries";
         TransactionRequest transactionRequest7 = new TransactionRequest(
-            year7,
-            amount7,
-            currency7,
-            description7
+            2007,
+            new BigDecimal("-700.00"),
+            "EUR",
+            "groceries"
         );
 
-        TransactionResponse transactionResponse6 = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(transactionRequest6)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody();
-        
-        TransactionResponse transactionResponse7 = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(transactionRequest7)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody();
+        TransactionResponse transactionResponse6 = Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequest6
+        );
 
-        // Act + Assert.
-        String expectedBodyJSON = """
+        TransactionResponse transactionResponse7 = Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequest7
+        );
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .get().uri("/api/v1/transactions")
+            .headers(
+                h -> h.setBearerAuth(accessToken)
+            )
+            .exchange()
+        ;
+
+        // Assert.
+        String expectedBodyJSON =
+            """
             [
                 {
                     id: %d,
@@ -850,99 +912,96 @@ class TransactionControllerTests {
                     description: "groceries"
                 }
             ]
-        """.formatted(
-            transactionResponse6.id(),
-            transactionResponse7.id()
-        );
-
-        restTestClient
-            .get().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
+            """.formatted(
+                transactionResponse6.id(),
+                transactionResponse7.id()
             )
-            .exchange()
-            .expectStatus().isOk()
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     @Test
     void update_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 3000 + 2003;
-        BigDecimal amount = new BigDecimal(
-            String.valueOf(-(3000 + 300.00))
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
-        String currency = "EUR";
-        String description = "groceries";
+
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            3000 + 2003,
+            new BigDecimal(
+                String.valueOf(-(3000 + 300.00))
+            ),
+            "EUR",
+            "groceries"
         );
 
-        TransactionResponse transactionResponse = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(transactionRequest)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody();
+        TransactionResponse transactionResponse = Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequest
+        );
         long transactionId = transactionResponse.id();
 
-        Integer updatedYear = null;
-        BigDecimal updatedAmount = new BigDecimal("-300.00");
-        String updatedCurrency = "EUR";
-        String updatedDescription = "groceries";
+        Integer inadmissibleYear = null;
         TransactionRequest updateRequest = new TransactionRequest(
-            updatedYear,
-            updatedAmount,
-            updatedCurrency,
-            updatedDescription
+            inadmissibleYear,
+            new BigDecimal("-300.00"),
+            "EUR",
+            "groceries"
         );
 
-        // Act + Assert.
-        String expectedBodyJSON1 = """
-            {
-                "error": "Validation failed",
-                "fieldErrors": {
-                    "year": "must not be null"
-                }
-            }
-        """;
-
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .put().uri("/api/v1/transactions/" + transactionId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(updateRequest)
             .exchange()
-            .expectStatus().isBadRequest()
+        ;
+
+        // Assert.
+        String expectedBodyJSON1 =
+            """
+            {
+                "error": "Validation failed",
+                "fieldErrors": {
+                    "year": "must not be null"
+                }
+            }
+            """
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
             .expectBody().json(
                 expectedBodyJSON1,
                 JsonCompareMode.STRICT
-            );
-        
-        String expectedBodyJSON2 = """
+            )
+        ;
+
+        String expectedBodyJSON2 =
+            """
             {
                 id: %d,
                 year: 5003,
@@ -950,7 +1009,10 @@ class TransactionControllerTests {
                 currency: "EUR",
                 description: "groceries"
             }
-        """.formatted(transactionId);
+            """.formatted(
+                transactionId
+            )
+        ;
 
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
@@ -958,105 +1020,114 @@ class TransactionControllerTests {
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON2,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     @Test
     void update_2() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2004;
-        BigDecimal amount = new BigDecimal("-400.00");
-        String currency = "EUR";
-        String description = "groceries";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            2004,
+            new BigDecimal("-400.00"),
+            "EUR",
+            "groceries"
         );
 
         long nonexistentId = 17;
 
-        // Arrange + Act.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .put().uri("/api/v1/transactions/" + nonexistentId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .body(transactionRequest)
             .exchange()
-            .expectStatus().isNotFound()
-            .expectBody().isEmpty();
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+            .expectBody().isEmpty()
+        ;
     }
 
     @Test
     void update_3() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 3000 + 2005;
-        BigDecimal amount = new BigDecimal(
-            String.valueOf(-(3000 + 500.00))
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
-        String currency = "EUR";
-        String description = "groceries";
+
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            3000 + 2005,
+            new BigDecimal(
+                String.valueOf(-(3000 + 500.00))
+            ),
+            "EUR",
+            "groceries"
         );
 
-        TransactionResponse transactionResponse = restTestClient
-            .post().uri("/api/v1/transactions")
+        TransactionResponse transactionResponse = Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequest
+        );
+        long transactionId = transactionResponse.id();
+
+        TransactionRequest updateTransactionRequest = new TransactionRequest(
+            2005,
+            new BigDecimal("-500.00"),
+            "EUR",
+            "groceries"
+        );
+
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
+            .put().uri("/api/v1/transactions/" + transactionId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
-            .body(transactionRequest)
+            .body(updateTransactionRequest)
             .exchange()
-            .expectStatus().isCreated()
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody();
-        long transactionId = transactionResponse.id();
+        ;
 
-        int updatedYear = 2005;
-        BigDecimal updatedAmount = new BigDecimal("-500.00");
-        String updatedCurrency = "EUR";
-        String updatedDescription = "groceries";
-        TransactionRequest updateTransactionRequest = new TransactionRequest(
-            updatedYear,
-            updatedAmount,
-            updatedCurrency,
-            updatedDescription
-        );
-
-        // Act + Assert.
-        String expectedBodyJSON = """
+        // Assert.
+        String expectedBodyJSON =
+            """
             {
                 id: %d,
                 year: 2005,
@@ -1064,117 +1135,127 @@ class TransactionControllerTests {
                 currency: "EUR",
                 description: "groceries"
             }
-        """.formatted(transactionId);
-
-        restTestClient
-            .put().uri("/api/v1/transactions/" + transactionId)
-            .headers(
-                h -> h.setBearerAuth(accessToken)
+            """.formatted(
+                transactionId
             )
-            .body(updateTransactionRequest)
-            .exchange()
-            .expectStatus().isOk()
+        ;
+
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
-        
+            )
+        ;
+
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isOk()
+            .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
-            );
+            )
+        ;
     }
 
     @Test
     void delete_1() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
+        );
 
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         long nonexistentId = 17;
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .delete().uri("/api/v1/transactions/" + nonexistentId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isNotFound()
-            .expectBody().isEmpty();
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+            .expectBody().isEmpty()
+        ;
     }
 
     @Test
     void delete_2() {
         // Arrange.
-        UserResponseCreate userResponseCreate = createUser(
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
             "test-" + "jd",
             "test-" + "john.doe@protonmail.com",
             "test-" + "123"
         );
-
-        String accessToken = obtainAccessToken(
-            "test-" + "john.doe@protonmail.com",
-            "test-" + "123"
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        int year = 2006;
-        BigDecimal amount = new BigDecimal("-600.00");
-        String currency = "EUR";
-        String description = "groceries";
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
+        );
+
         TransactionRequest transactionRequest = new TransactionRequest(
-            year,
-            amount,
-            currency,
-            description
+            2006,
+            new BigDecimal("-600.00"),
+            "EUR",
+            "groceries"
         );
 
-        TransactionResponse transactionResponse = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(transactionRequest)
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody();
+        TransactionResponse transactionResponse = Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequest
+        );
         long transactionId = transactionResponse.id();
 
-        // Act + Assert.
-        restTestClient
+        // Act.
+        RestTestClient.ResponseSpec responseSpec = restTestClient
             .delete().uri("/api/v1/transactions/" + transactionId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isNoContent()
-            .expectBody().isEmpty();
-        
+        ;
+
+        // Assert.
+        responseSpec
+            .expectStatus().isEqualTo(HttpStatus.NO_CONTENT)
+            .expectBody().isEmpty()
+        ;
+
         restTestClient
             .get().uri("/api/v1/transactions/" + transactionId)
             .headers(
                 h -> h.setBearerAuth(accessToken)
             )
             .exchange()
-            .expectStatus().isNotFound()
-            .expectBody().isEmpty();
+            .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+            .expectBody().isEmpty()
+        ;
     }
 
     /*
@@ -1238,19 +1319,20 @@ class TransactionControllerTests {
     @Test
     void delete_user() {
         // Arrange.
-        String username = "jd";
-        String email = "john.doe@protonmail.com";
-        String password = "123";
-
-        UserResponseCreate userResponseCreate = createUser(
-            username,
-            email,
-            password
+        UserRequestCreate userRequestCreate = new UserRequestCreate(
+            "test-" + "jd",
+            "test-" + "john.doe@protonmail.com",
+            "test-" + "123"
+        );
+        UserResponseCreate userResponseCreate = Utilities.createUser(
+            restTestClient,
+            userRequestCreate
         );
 
-        String accessToken = obtainAccessToken(
-            email,
-            password
+        String accessToken = Utilities.obtainAccessToken(
+            restTestClient,
+            userRequestCreate.email(),
+            userRequestCreate.password()
         );
 
         TransactionRequest transactionRequest1 = new TransactionRequest(
@@ -1259,33 +1341,26 @@ class TransactionControllerTests {
             "EUR",
             "groceries"
         );
-        TransactionResponse transactionResponse1 = restTestClient
-            .post().uri("/api/v1/transactions")
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .body(transactionRequest1)
-            .exchange()
-            .expectStatus().isEqualTo(HttpStatus.CREATED)
-            .expectBody(TransactionResponse.class)
-            .returnResult()
-            .getResponseBody()
-        ;
+        TransactionResponse transactionResponse1 = Utilities.createTransaction(
+            restTestClient,
+            accessToken,
+            transactionRequest1
+        );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
             .delete().uri("/api/v1/users/" + userResponseCreate.id())
             .headers(
                 h -> h.setBasicAuth(
-                    email,
-                    password
+                    userRequestCreate.email(),
+                    userRequestCreate.password()
                 )
             )
             .exchange()
         ;
 
         // Assert.
-        String expectedBodyJSON = 
+        String expectedBodyJSON =
             """
             {
                 "error": "unable to delete your user, because you still have transactions"
