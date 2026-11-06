@@ -30,7 +30,7 @@ To run a single test case (with more logging output):
 $ ./mvnw \
     -q \
     test \
-    -Dtest=TransactionControllerTests#create_1 \
+    -Dtest=TransactionControllerSingleUserCreateTests#create_1 \
     -Dlogging.level.org.springframework.security=DEBUG \
     -Dlogging.level.org.springframework.web=TRACE \
     -Dlogging.level.org.springframework.test=DEBUG \
@@ -60,7 +60,7 @@ $ ./mvnw \
 # )
 $ ./mvnw \
     -q \
-    -Dtest=TransactionControllerTests#create_1 \
+    -Dtest='ExchangeRateControllerSingleUser*Tests' \
     -Dlogging.level.org.springframework.security=DEBUG \
     -Dlogging.level.org.springframework.web=TRACE \
     -Dlogging.level.org.springframework.test=DEBUG \

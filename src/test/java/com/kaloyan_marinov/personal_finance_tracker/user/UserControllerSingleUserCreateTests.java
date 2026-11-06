@@ -13,8 +13,6 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.kaloyan_marinov.personal_finance_tracker.Utilities;
-
 @SpringBootTest(
     properties = {
         "spring.datasource.url=jdbc:h2:mem:test",
@@ -31,7 +29,7 @@ and then the `RestTestClient` binds to the created `MockMvc` bean.
 */
 @AutoConfigureMockMvc
 @Transactional
-public class UserControllerTests {
+class UserControllerSingleUserCreateTests {
 
     @Autowired
     private RestTestClient restTestClient;
@@ -426,144 +424,6 @@ public class UserControllerTests {
                 expectedBodyJSON,
                 JsonCompareMode.STRICT
             )
-        ;
-    }
-
-    /**
-     * Attempts to delete a user with Bearer Auth
-     * should be rejected.
-     */
-    @Test
-    void delete_1() {
-        // Arrange.
-        String username = "jd";
-        String email = "john.doe@protonmail.com";
-        String password = "123";
-
-        UserRequestCreate userRequestCreate = new UserRequestCreate(
-            username,
-            email,
-            password
-        );
-        UserResponseCreate userResponseCreate = Utilities.createUser(
-            restTestClient,
-            userRequestCreate
-        );
-
-        String accessToken = Utilities.obtainAccessToken(
-            restTestClient,
-            email,
-            password
-        );
-
-        // Act.
-        RestTestClient.ResponseSpec responseSpec = restTestClient
-            .delete().uri("/api/v1/users/" + userResponseCreate.id())
-            .headers(
-                h -> h.setBearerAuth(accessToken)
-            )
-            .exchange()
-        ;
-
-        // Assert.
-        responseSpec
-            .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED)
-            .expectHeader().valueEquals(
-                "WWW-Authenticate",
-                "Basic realm=\"Realm\", charset=\"UTF-8\""
-            )
-        ;
-    }
-
-    /**
-     * A request for deleting a user with correct Basic Auth credentials
-     * should not be allowed to delete a user different from the authenticated one.
-     */
-    @Test
-    void delete_2() {
-        // Arrange.
-        UserRequestCreate jdUserRequestCreate = new UserRequestCreate(
-            "jd",
-            "john.doe@protonmail.com",
-            "123"
-        );
-        UserResponseCreate jdUserResponseCreate = Utilities.createUser(
-            restTestClient,
-            jdUserRequestCreate
-        );
-
-        UserRequestCreate msUserRequestCreate = new UserRequestCreate(
-            "ms",
-            "mary.smith@protonmail.com",
-            "456"
-        );
-        UserResponseCreate msUserResponseCreate = Utilities.createUser(
-            restTestClient,
-            msUserRequestCreate
-        );
-
-        // Act.
-        RestTestClient.ResponseSpec responseSpec = restTestClient
-            .delete().uri("/api/v1/users/" + jdUserResponseCreate.id())
-            .headers(
-                h -> h.setBasicAuth(
-                    msUserRequestCreate.email(),
-                    msUserRequestCreate.password()
-                )
-            )
-            .exchange()
-        ;
-
-        // Assert.
-        responseSpec
-            .expectStatus().isEqualTo(HttpStatus.FORBIDDEN)
-        ;
-
-        responseSpec
-            .expectBody()
-            .jsonPath("$.length()").isEqualTo(1)
-            .jsonPath("error").isEqualTo(
-                "not allowed to delete a user other than the authenticated one"
-            )
-        ;
-    }
-
-    /**
-     * This test case exercised the happy path.
-     */
-    @Test
-    void delete_3() {
-        // Arrange.
-        String username = "jd";
-        String email = "john.doe@protonmail.com";
-        String password = "123";
-
-        UserRequestCreate userRequestCreate = new UserRequestCreate(
-            username,
-            email,
-            password
-        );
-        UserResponseCreate userResponseCreate = Utilities.createUser(
-            restTestClient,
-            userRequestCreate
-        );
-
-        // Act.
-        RestTestClient.ResponseSpec responseSpec = restTestClient
-            .delete().uri("/api/v1/users/" + userResponseCreate.id())
-            .headers(
-                h -> h.setBasicAuth(
-                    email,
-                    password
-                )
-            )
-            .exchange()
-        ;
-
-        // Assert.
-        responseSpec
-            .expectStatus().isEqualTo(HttpStatus.NO_CONTENT)
-            .expectBody().isEmpty()
         ;
     }
 }

@@ -38,7 +38,7 @@ and then the `RestTestClient` binds to the created `MockMvc` bean.
 */
 @AutoConfigureMockMvc
 @Transactional
-class TotalsControllerTests {
+class TotalsControllerSingleUserTests {
 
     @Autowired
     private RestTestClient restTestClient;
