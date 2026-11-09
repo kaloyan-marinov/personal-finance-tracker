@@ -1,4 +1,4 @@
-# introduction
+# Introduction
 
 `PersonalFinanceTracker` is a web application for tracking one's income, expenses, and wealth.
 
@@ -14,7 +14,7 @@ as well as computing one's net worth (as of a given year).
 
 
 
-# run the test suite
+# Run the test suite
 
 ```shell
 $ ./mvnw test
@@ -77,7 +77,7 @@ exit code: 0
 
 
 
-# configure
+# Configure
 
 ```shell
 $ cp \
@@ -89,7 +89,7 @@ $ cp \
 
 
 
-# create an empty database
+# Create an empty database
 
 ```shell
 $ podman run \
@@ -120,7 +120,7 @@ Empty set (0.00 sec)
 
 
 
-# apply the database migrations
+# Apply the database migrations
 
 ```shell
 $ (
@@ -180,7 +180,7 @@ mysql> select ID, FILENAME, DATEEXECUTED from DATABASECHANGELOG;
 
 
 
-# run the application from the command line
+# Run the application from the command line
 
 using one of the following:
 
@@ -276,8 +276,12 @@ Use another terminal window to issue these HTTP requests:
 $ chmod u+x scripts/0_issue_requests_for_CRUD_operations_with_users.sh
 $ scripts/0_issue_requests_for_CRUD_operations_with_users.sh
 
+# Create an empty database from scratch.
+
 $ chmod u+x scripts/5_issue_requests_for_tokens.sh
 $ scripts/5_issue_requests_for_tokens.sh
+
+# Create an empty database from scratch.
 
 $ chmod u+x scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
 $ scripts/1_issue_requests_for_CRUD_operations_with_transactions.sh
@@ -294,12 +298,15 @@ $ scripts/3_issue_requests_for_CRUD_operations_with_exchange_rates.sh
 
 # Create an empty database from scratch.
 
+$ chmod u+x scripts/4_issue_requests_for_computing_totals_and_converting.sh
 $ scripts/4_issue_requests_for_computing_totals_and_converting.sh
 ```
 
 
 
-# cleanup
+# Clean up
+
+Discard the containerized database:
 
 ```shell
 $ podman container rm -f container-pft-mysql \

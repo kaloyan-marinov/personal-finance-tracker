@@ -3,8 +3,10 @@ package com.kaloyan_marinov.personal_finance_tracker.transaction;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
 
 /*
@@ -16,13 +18,16 @@ That «bean definition» has almost the same name as the class
 (the only difference will be a change in the case).
 In this case, the name will of the «bean definition» be `transactionRepository`.
  */
-public interface TransactionRepository extends CrudRepository<Transaction, Long> {
+public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
     boolean existsByUserId(Long userId);
 
     Optional<Transaction> findByIdAndUserId(Long id, Long userId);
 
-    List<Transaction> findAllByUserId(Long userId);
+    Page<Transaction> findAllByUserId(
+        Long userId,
+        Pageable pageable
+    );
 
     /**
      * The summing happens in the database,

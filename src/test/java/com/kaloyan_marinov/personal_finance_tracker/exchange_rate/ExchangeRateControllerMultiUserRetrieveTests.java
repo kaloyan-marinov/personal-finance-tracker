@@ -10,6 +10,7 @@ import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTe
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,22 +79,22 @@ class ExchangeRateControllerMultiUserRetrieveTests {
             msUserRequestCreate.password()
         );
 
-        ExchangeRateRequestCreate erRequest = new ExchangeRateRequestCreate(
+        ExchangeRateRequestCreate jdExchangeRateRequest = new ExchangeRateRequestCreate(
             2003,
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
 
-        ExchangeRateResponse erResponse = Utilities.createExchangeRate(
+        ExchangeRateResponse jdExchangeRateResponse = Utilities.createExchangeRate(
             restTestClient,
             jdAccessToken,
-            erRequest
+            jdExchangeRateRequest
         );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
-            .get().uri("/api/v1/exchange-rates/" + erResponse.year() + "/" + erResponse.sourceCurrency() + "/" + erResponse.targetCurrency())
+            .get().uri("/api/v1/exchange-rates/" + jdExchangeRateResponse.year() + "/" + jdExchangeRateResponse.sourceCurrency() + "/" + jdExchangeRateResponse.targetCurrency())
             .headers(
                 h -> h.setBearerAuth(msAccessToken)
             )
@@ -154,28 +155,28 @@ class ExchangeRateControllerMultiUserRetrieveTests {
         String sourceCurrency = "EUR";
         String targetCurrency = "USD";
 
-        ExchangeRateRequestCreate erRequest1 = new ExchangeRateRequestCreate(
+        ExchangeRateRequestCreate jdExchangeRateRequest = new ExchangeRateRequestCreate(
             year,
             sourceCurrency,
             targetCurrency,
             new BigDecimal("1.100")
         );
-        ExchangeRateResponse erResponse1 = Utilities.createExchangeRate(
+        ExchangeRateResponse jdExchangeRateResponse = Utilities.createExchangeRate(
             restTestClient,
             jdAccessToken,
-            erRequest1
+            jdExchangeRateRequest
         );
 
-        ExchangeRateRequestCreate erRequest2 = new ExchangeRateRequestCreate(
+        ExchangeRateRequestCreate msExchangeRateRequest = new ExchangeRateRequestCreate(
             year,
             sourceCurrency,
             targetCurrency,
             new BigDecimal("1.200")
         );
-        ExchangeRateResponse erResponse2 = Utilities.createExchangeRate(
+        ExchangeRateResponse msExchangeRateResponse = Utilities.createExchangeRate(
             restTestClient,
             msAccessToken,
-            erRequest2
+            msExchangeRateRequest
         );
 
         // Act.
@@ -196,11 +197,11 @@ class ExchangeRateControllerMultiUserRetrieveTests {
         ;
 
         ExchangeRateResponse expected = new ExchangeRateResponse(
-            erResponse1.id(),
+            jdExchangeRateResponse.id(),
             year,
             sourceCurrency,
             targetCurrency,
-            erRequest1.sourceToTargetFactor()
+            jdExchangeRateRequest.sourceToTargetFactor()
         );
         Assertions.assertEquals(expected, observed);
     }
@@ -249,28 +250,40 @@ class ExchangeRateControllerMultiUserRetrieveTests {
             msUserRequestCreate.password()
         );
 
-        ExchangeRateRequestCreate exchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
+        ExchangeRateRequestCreate jdExchangeRateRequestCreate = new ExchangeRateRequestCreate(
             2001,
             "EUR",
             "USD",
             new BigDecimal("1.085")
         );
-        ExchangeRateResponse exchangeRateResponse1 = Utilities.createExchangeRate(
+        ExchangeRateResponse jdExchangeRateResponse = Utilities.createExchangeRate(
             restTestClient,
             jdAccessToken,
-            exchangeRateRequestCreate1
+            jdExchangeRateRequestCreate
         );
 
-        ExchangeRateRequestCreate exchangeRateRequestCreate2 = new ExchangeRateRequestCreate(
+        ExchangeRateRequestCreate msExchangeRateRequestCreate1 = new ExchangeRateRequestCreate(
             2002,
             "CHF",
             "EUR",
-            new BigDecimal("1.06")
+            new BigDecimal("1.02")
         );
-        ExchangeRateResponse exchangeRateResponse2 = Utilities.createExchangeRate(
+        ExchangeRateResponse msExchangeRateResponse1 = Utilities.createExchangeRate(
             restTestClient,
             msAccessToken,
-            exchangeRateRequestCreate2
+            msExchangeRateRequestCreate1
+        );
+
+        ExchangeRateRequestCreate msExchangeRateRequestCreate2 = new ExchangeRateRequestCreate(
+            2004,
+            "CHF",
+            "EUR",
+            new BigDecimal("1.04")
+        );
+        ExchangeRateResponse msExchangeRateResponse2 = Utilities.createExchangeRate(
+            restTestClient,
+            msAccessToken,
+            msExchangeRateRequestCreate2
         );
 
         // Act.
@@ -285,23 +298,39 @@ class ExchangeRateControllerMultiUserRetrieveTests {
         // Assert.
         String expectedBoyJSON =
             """
-            [
-                {
-                    id: %d,
-                    year: 2002,
-                    sourceCurrency: "CHF",
-                    targetCurrency: "EUR",
-                    sourceToTargetFactor: 1.06
+            {
+                resources: [
+                    {
+                        id: %d,
+                        year: 2002,
+                        sourceCurrency: "CHF",
+                        targetCurrency: "EUR",
+                        sourceToTargetFactor: 1.02
+                    },
+                    {
+                        id: %d,
+                        year: 2004,
+                        sourceCurrency: "CHF",
+                        targetCurrency: "EUR",
+                        sourceToTargetFactor: 1.04
+                    }
+                ],
+                paginationInfo: {
+                    total: 2,
+                    pageNumber: 0,
+                    pageSize: 10
                 }
-            ]
+            }
             """.formatted(
-                exchangeRateResponse2.id()
+                msExchangeRateResponse1.id(),
+                msExchangeRateResponse2.id()
             )
         ;
         responseSpec
             .expectStatus().isEqualTo(HttpStatus.OK)
             .expectBody().json(
-                expectedBoyJSON
+                expectedBoyJSON,
+                JsonCompareMode.STRICT
             )
         ;
     }

@@ -5,6 +5,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -17,11 +21,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kaloyan_marinov.personal_finance_tracker.common.ConstantsForPagination;
+import com.kaloyan_marinov.personal_finance_tracker.common.PaginatedResponse;
+import com.kaloyan_marinov.personal_finance_tracker.common.PaginationInfo;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRepository;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 
 // An exchange rate is addressed by its natural key, `{year}/{sourceCurrency}/{targetCurrency}`,
@@ -185,8 +195,15 @@ public class ExchangeRateController {
     }
 
     @GetMapping("")
-    public ResponseEntity<List<ExchangeRateResponse>> retrieveAll(
-        Authentication authentication
+    public ResponseEntity<PaginatedResponse<ExchangeRateResponse>> retrieveAll(
+        Authentication authentication,
+        @RequestParam(defaultValue = "" + ConstantsForPagination.PAGE_NUMBER_DEFAULT)
+        @Min(ConstantsForPagination.PAGE_NUMBER_MIN)
+        int pageNumber,
+        @RequestParam(defaultValue = "" + ConstantsForPagination.PAGE_SIZE_DEFAULT)
+        @Min(ConstantsForPagination.PAGE_SIZE_MIN)
+        @Max(ConstantsForPagination.PAGE_SIZE_MAX)
+        int pageSize
     ) {
         /*
         An alternative implementation would be
@@ -206,10 +223,19 @@ public class ExchangeRateController {
         Jwt jwt = jwtAuthToken.getToken();
         Long userId = jwt.getClaim("userId");
 
-        List<ExchangeRate> exchangeRates = exchangeRateRepository.findAllByUserId(userId);
+        String nameOfEntityProperty = "id";
+        Pageable pageable = PageRequest.of(
+            pageNumber,
+            pageSize,
+            Sort.by(nameOfEntityProperty)
+        );
+        Page<ExchangeRate> pageOfExchangeRates = exchangeRateRepository.findAllByUserId(
+            userId,
+            pageable
+        );
 
-        List<ExchangeRateResponse> erResponses = new ArrayList<>();
-        for (ExchangeRate er : exchangeRates) {
+        List<ExchangeRateResponse> exchangeRateResponses = new ArrayList<>();
+        for (ExchangeRate er : pageOfExchangeRates.getContent()) {
             ExchangeRateResponse erR = new ExchangeRateResponse(
                 er.getId(),
                 er.getYear(),
@@ -217,12 +243,20 @@ public class ExchangeRateController {
                 er.getTargetCurrency(),
                 er.getSourceToTargetFactor()
             );
-            erResponses.add(erR);
+            exchangeRateResponses.add(erR);
         }
+        PaginatedResponse<ExchangeRateResponse> paginatedResponse = new PaginatedResponse<>(
+            exchangeRateResponses,
+            new PaginationInfo(
+                pageOfExchangeRates.getTotalElements(),
+                pageNumber,
+                pageSize
+            )
+        );
 
         return ResponseEntity
             .status(HttpStatus.OK)
-            .body(erResponses)
+            .body(paginatedResponse)
         ;
     }
 

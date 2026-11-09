@@ -4,13 +4,18 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Long> {
 
     boolean existsByUserId(Long userId);
 
-    List<ExchangeRate> findAllByUserId(Long userId);
+    Page<ExchangeRate> findAllByUserId(
+        Long userId,
+        Pageable pageable
+    );
 
     boolean existsByUserIdAndYearAndSourceCurrencyAndTargetCurrency(
         Long userId,

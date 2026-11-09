@@ -182,6 +182,19 @@ eval "$cmd"
 
 
 
+echo "sleeping for $ONE_SECOND second(s)"
+sleep $ONE_SECOND
+
+cmd="
+http \\
+    'localhost:8080/api/v1/transactions?pageSize=3&pageNumber=1' \\
+    Authorization:\"Bearer ${TKN}\"
+"
+echo "$cmd"
+eval "$cmd"
+
+
+
 # Retrieve a single transaction.
 nonexistent_id=17
 

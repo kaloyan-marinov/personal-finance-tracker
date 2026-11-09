@@ -267,7 +267,6 @@ class TokenControllerSingleUserTests {
     }
 
     /*
-    // TODO: (2026/11/04, 14:17 UTC) consider swapping the order of this test case and the preceding one
     The payload of a JWT is only `base64`-encoded (not encrypted),
     so it must not contain the password of the application user.
     */

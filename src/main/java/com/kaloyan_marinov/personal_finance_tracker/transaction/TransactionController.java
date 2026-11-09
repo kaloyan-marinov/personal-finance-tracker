@@ -5,6 +5,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -17,11 +21,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kaloyan_marinov.personal_finance_tracker.common.ConstantsForPagination;
+import com.kaloyan_marinov.personal_finance_tracker.common.PaginatedResponse;
+import com.kaloyan_marinov.personal_finance_tracker.common.PaginationInfo;
 import com.kaloyan_marinov.personal_finance_tracker.user.UserRepository;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 @RestController
 @RequestMapping("/api/v1/transactions")
@@ -145,10 +155,17 @@ public class TransactionController {
             .body(transactionResponse)
         ;
     }
-    
+
     @GetMapping("")
-    public ResponseEntity<Iterable<TransactionResponse>> retrieveAll(
-        Authentication authentication
+    public ResponseEntity<PaginatedResponse<TransactionResponse>> retrieveAll(
+        Authentication authentication,
+        @RequestParam(defaultValue = "" + ConstantsForPagination.PAGE_NUMBER_DEFAULT)
+        @Min(ConstantsForPagination.PAGE_NUMBER_MIN)
+        int pageNumber,
+        @RequestParam(defaultValue = "" + ConstantsForPagination.PAGE_SIZE_DEFAULT)
+        @Min(ConstantsForPagination.PAGE_SIZE_MIN)
+        @Max(ConstantsForPagination.PAGE_SIZE_MAX)
+        int pageSize
     ) {
         /*
         An alternative implementation would be
@@ -168,10 +185,19 @@ public class TransactionController {
         Jwt jwt = jwtAuthToken.getToken();
         Long userId = jwt.getClaim("userId");
 
-        Iterable<Transaction> transactions = transactionRepository.findAllByUserId(userId);
+        String nameOfEntityProperty = "id";
+        Pageable pageable = PageRequest.of(
+            pageNumber,
+            pageSize,
+            Sort.by(nameOfEntityProperty)
+        );
+        Page<Transaction> pageOfTransactions = transactionRepository.findAllByUserId(
+            userId,
+            pageable
+        );
 
         List<TransactionResponse> transactionResponses = new ArrayList<>();
-        for (Transaction t : transactions) {
+        for (Transaction t : pageOfTransactions.getContent()) {
             TransactionResponse trR = new TransactionResponse(
                 t.getId(),
                 t.getYear(),
@@ -181,10 +207,18 @@ public class TransactionController {
             );
             transactionResponses.add(trR);
         }
+        PaginatedResponse<TransactionResponse> paginatedResponse = new PaginatedResponse<>(
+            transactionResponses,
+            new PaginationInfo(
+                pageOfTransactions.getTotalElements(),
+                pageNumber,
+                pageSize
+            )
+        );
 
         return ResponseEntity
             .status(HttpStatus.OK)
-            .body(transactionResponses)
+            .body(paginatedResponse)
         ;
     }
 

@@ -77,21 +77,21 @@ class TransactionControllerMultiUserRetrieveTests {
             msUserRequestCreate.password()
         );
 
-        TransactionRequest transactionRequest = new TransactionRequest(
+        TransactionRequest jdTransactionRequest = new TransactionRequest(
             2006,
             new BigDecimal("-600.00"),
             "EUR",
             "groceries"
         );
-        TransactionResponse transactionResponse = Utilities.createTransaction(
+        TransactionResponse jdTransactionResponse = Utilities.createTransaction(
             restTestClient,
             jdAccessToken,
-            transactionRequest
+            jdTransactionRequest
         );
 
         // Act.
         RestTestClient.ResponseSpec responseSpec = restTestClient
-            .get().uri("/api/v1/transactions/" + transactionResponse.id())
+            .get().uri("/api/v1/transactions/" + jdTransactionResponse.id())
             .headers(
                 h -> h.setBearerAuth(msAccessToken)
             )
@@ -110,9 +110,11 @@ class TransactionControllerMultiUserRetrieveTests {
      * each of whom has/owns >=1 transaction.
      *
      * When User 2 issues `GET /api/v1/transactions`,
-     * the response body should:
+     * the `resources` in the response body should:
      * (a) consists of the transactions owned by User 2;
      * (b) not contain any transaction owned by User 1.
+     * Similarly, the `paginationInfo` in the response body should
+     * summarize only the transactions owned by User 2.
      */
     @Test
     void retrieveAll_1() {
@@ -149,28 +151,40 @@ class TransactionControllerMultiUserRetrieveTests {
             msUserRequestCreate.password()
         );
 
-        TransactionRequest transactionRequest1 = new TransactionRequest(
+        TransactionRequest jdTransactionRequest1 = new TransactionRequest(
             2006,
             new BigDecimal("-600.00"),
             "EUR",
             "groceries"
         );
-        TransactionResponse transactionResponse1 = Utilities.createTransaction(
+        TransactionResponse jdTransactionResponse1 = Utilities.createTransaction(
             restTestClient,
             jdAccessToken,
-            transactionRequest1
+            jdTransactionRequest1
         );
 
-        TransactionRequest transactionRequest2 = new TransactionRequest(
+        TransactionRequest msTransactionRequest1 = new TransactionRequest(
             2007,
             new BigDecimal("-700.00"),
             "EUR",
             "groceries"
         );
-        TransactionResponse transactionResponse2 = Utilities.createTransaction(
+        TransactionResponse msTransactionResponse1 = Utilities.createTransaction(
             restTestClient,
             msAccessToken,
-            transactionRequest2
+            msTransactionRequest1
+        );
+
+        TransactionRequest msTransactionRequest2 = new TransactionRequest(
+            2009,
+            new BigDecimal("-50.00"),
+            "USD",
+            "gym membership"
+        );
+        TransactionResponse msTransactionResponse2 = Utilities.createTransaction(
+            restTestClient,
+            msAccessToken,
+            msTransactionRequest2
         );
 
         // Act.
@@ -185,17 +199,32 @@ class TransactionControllerMultiUserRetrieveTests {
         // Assert.
         String expectedBodyJSON =
             """
-            [
-                {
-                    "id": %d,
-                    "year": 2007,
-                    "amount": -700.00,
-                    "currency": "EUR",
-                    "description": "groceries"
+            {
+                resources: [
+                    {
+                        "id": %d,
+                        "year": 2007,
+                        "amount": -700.00,
+                        "currency": "EUR",
+                        "description": "groceries"
+                    },
+                    {
+                        "id": %d,
+                        "year": 2009,
+                        "amount": -50.00,
+                        "currency": "USD",
+                        "description": "gym membership"
+                    }
+                ],
+                paginationInfo: {
+                    total: 2,
+                    pageNumber: 0,
+                    pageSize: 10
                 }
-            ]
+            }
             """.formatted(
-                transactionResponse2.id()
+                msTransactionResponse1.id(),
+                msTransactionResponse2.id()
             )
         ;
         responseSpec
